@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin · Night Market Chinese</title>
+<style>body{font:16px/1.4 "PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;max-width:900px;margin:0 auto;padding:16px;background:#eee}section{background:#fff;border-radius:12px;padding:12px;margin:12px 0}input,button{font:inherit;padding:8px 12px;margin:3px}button{cursor:pointer}.row{display:flex;gap:8px;align-items:center;border-bottom:1px solid #0002;padding:4px 0}.row b{font-size:22px;min-width:130px}.have{color:#2a9d8f}.sp{flex:1}</style></head>
+<body><h1>Admin</h1><section><b>Admin key</b> <input id="key" type="password" placeholder="ADMIN_KEY"> <button id="load">Load</button></section>
+<section><b>Make a teacher account</b><br><input id="tu" placeholder="username"><input id="tp" type="password" placeholder="password (6+)"><button id="mk">Create</button> <span id="tm"></span></section>
+<section><b>Audio</b><div class="note">Record the teacher voice for each item (hold the phone close, one clean take). Pupils never hear anything unless a clip exists; otherwise the browser voice reads it. The Recording checklist is in docs/RECORDING_CHECKLIST.md.</div><div id="list"></div></section>
+<script type="module">
+import D from './zh-data.js';
+const $=s=>document.querySelector(s);const key=()=>$('#key').value;
+const items=[...D.WORDS.map(w=>['w',w.w]),...D.SENTS.map(s=>['s',s.text.replace(/[。？]/g,'')])];
+async function load(){const r=await fetch('/api/admin/audio',{headers:{'x-admin-key':key()}});if(!r.ok){$('#list').textContent='Wrong admin key';return}const have=new Set((await r.json()).clips.map(c=>c.kind+':'+c.key));$('#list').replaceChildren();
+ for(const [k,t] of items){const row=document.createElement('div');row.className='row';const b=document.createElement('b');b.textContent=t;const st=document.createElement('span');st.className='sp'+(have.has(k+':'+t)?' have':'');st.textContent=have.has(k+':'+t)?'✔ recorded':'not yet';
+  const rec=document.createElement('button');rec.textContent='🎤 Record (3 s)';rec.onclick=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({audio:true}),mr=new MediaRecorder(s),ps=[];mr.ondataavailable=e=>ps.push(e.data);mr.onstop=async()=>{s.getTracks().forEach(x=>x.stop());const blob=new Blob(ps);const r=await fetch('/api/admin/audio?kind='+k+'&key='+encodeURIComponent(t),{method:'POST',headers:{'x-admin-key':key(),'content-type':mr.mimeType||'audio/webm'},body:blob});st.textContent=r.ok?'✔ recorded':'failed';st.className='sp'+(r.ok?' have':'')};mr.start();rec.textContent='… recording';setTimeout(()=>{mr.stop();rec.textContent='🎤 Record (3 s)'},k==='s'?6000:3000)}catch{st.textContent='microphone not allowed'}};
+  const play=document.createElement('button');play.textContent='▶';play.onclick=()=>new Audio('/api/audio/'+k+'/'+encodeURIComponent(t)).play();row.append(b,st,rec,play);$('#list').append(row)}}
+$('#load').onclick=load;
+$('#mk').onclick=async()=>{const r=await fetch('/api/admin/teacher',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:key(),user:$('#tu').value,pass:$('#tp').value})});$('#tm').textContent=r.ok?'Created':(await r.json()).error};
+</script></body></html>

@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teacher · Night Market Chinese</title>
+<style>body{font:16px/1.4 "PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;max-width:900px;margin:0 auto;padding:16px;background:#fff6e0;color:#2b2140}h1{margin:.2em 0}section{background:#fff;border-radius:14px;padding:12px;margin:12px 0;box-shadow:0 1px 4px #0002}input,select,button{font:inherit;padding:8px 12px;margin:3px;border-radius:10px;border:1px solid #888}button{background:#2b2140;color:#fff;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #0002;text-align:left}.note{font-size:14px;color:#555}</style></head>
+<body><h1>夜市 Teacher page</h1><div id="o"></div><script type="module">
+const o=document.getElementById('o');let tok=null;
+const api=async(p,b)=>{const r=await fetch(p,{method:b?'POST':'GET',headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:b?JSON.stringify(b):undefined});return{s:r.status,j:await r.json().catch(()=>({}))}};
+const h=(t,a={},...k)=>{const e=document.createElement(t);for(const x in a){if(x.startsWith('on'))e.addEventListener(x.slice(2),a[x]);else if(x==='value')e.value=a[x];else if(x==='checked')e.checked=a[x];else e.setAttribute(x,a[x])}e.append(...k.flat().filter(c=>c!=null).map(c=>c.nodeType?c:document.createTextNode(c)));return e};
+function login(m){const u=h('input',{placeholder:'username'}),p=h('input',{type:'password',placeholder:'password'});o.replaceChildren(h('section',{},h('b',{},'Sign in'),h('br'),u,p,h('button',{onclick:async()=>{const r=await api('/api/teacher/login',{user:u.value,pass:p.value});if(r.s!==200)return login(r.j.error);tok=r.j.tok;main()}},'Sign in'),h('div',{},m||''),h('div',{class:'note'},'No account? Ask the person who runs the Admin page to make one for you.')))}
+async function main(){const cl=(await api('/api/teacher/classes')).j.classes||[],name=h('input',{placeholder:'New class name, e.g. 5A'});
+ const secs=[h('section',{},name,h('button',{onclick:async()=>{await api('/api/teacher/class',{name:name.value});main()}},'Create class'))];
+ for(const c of cl){const sec=h('section',{},h('h2',{},c.name+'  ·  code '+c.code));
+  const chk=(label,key,val)=>h('label',{},h('input',{type:'checkbox',checked:val,onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{[key]:e.target.checked}})}}),' '+label+'  ');
+  const pin=h('select',{onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{pinyin:e.target.value}})}},[['tap','Tap to show pinyin'],['on','Always show pinyin'],['off','Never show pinyin']].map(([v,t])=>{const op=h('option',{value:v},t);if(c.cfg.pinyin===v)op.selected=true;return op}));
+  const cap=h('select',{onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{unitCap:+e.target.value}})}},[1,2,3,4,5,6].map(n=>{const op=h('option',{value:n},'Up to unit '+n);if(c.cfg.unitCap===n)op.selected=true;return op}));
+  sec.append(chk('Chinese room on','on',c.cfg.on),chk('Voice practice on (default off)','voice',c.cfg.voice),pin,cap,h('div',{class:'note'},'Voice also needs a parent or guardian to tick yes inside the app. Use first names or nicknames only.'));
+  const t=h('table',{},h('tr',{},h('th',{},'Pupil'),h('th',{},'Unit'),h('th',{},'Mastered'),h('th',{},'⭐'),h('th',{},'Voice yes'),h('th',{},'')));
+  const ps=(await api('/api/teacher/students?code='+c.code)).j.students||[];
+  for(const s of ps)t.append(h('tr',{},h('td',{},s.name),h('td',{},h('select',{onchange:async e=>{await api('/api/teacher/unit',{id:s.id,unit:+e.target.value})}},[1,2,3,4,5,6].map(n=>{const op=h('option',{value:n},n);if(s.unit===n)op.selected=true;return op}))),h('td',{},s.mastered),h('td',{},s.xp),h('td',{},s.consent?'yes':'no'),h('td',{},h('button',{onclick:async()=>{if(confirm('Remove '+s.name+' and ALL their data? This cannot be undone.')){await api('/api/teacher/remove',{id:s.id});main()}}},'Remove'))));
+  sec.append(t);secs.push(sec)}
+ o.replaceChildren(...secs)}
+login();</script></body></html>

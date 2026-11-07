@@ -1,0 +1,39 @@
+/* Night Market 夜市: a new skin for Tier C. Deep indigo night, lantern red and gold, paper cards. System Chinese fonts only (no third-party hosts). */
+:root{--night:#1b1740;--night2:#2a2560;--lantern:#e8554e;--gold:#ffc857;--paper:#fff6e0;--ink:#2b2140;--jade:#2a9d8f;--soft:#e9defa;
+ --zh:"PingFang SC","Noto Sans SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC",sans-serif;--kai:"Kaiti SC","STKaiti","KaiTi","BiauKai","Noto Serif SC",var(--zh)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:radial-gradient(circle at 20% 0,var(--night2),var(--night) 60%);color:var(--paper);font:18px/1.35 var(--zh);overflow:hidden}
+#app{height:100dvh;display:flex;flex-direction:column;max-width:900px;margin:0 auto;padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;gap:8px;min-height:75px}.top .sp{flex:1}
+.lantern-row{height:14px;background:repeating-linear-gradient(90deg,var(--lantern) 0 18px,transparent 18px 36px);opacity:.7;border-radius:8px;margin:2px 0 6px}
+button{font:inherit;color:inherit;border:0;cursor:pointer;min-height:75px;min-width:75px;border-radius:20px;padding:10px 16px;background:var(--night2);box-shadow:0 3px 0 #0006}
+button:active{transform:translateY(2px);box-shadow:none}button:focus-visible{outline:4px solid var(--gold)}
+button.small{min-height:75px;min-width:75px;font-size:20px;border-radius:18px;padding:6px 12px}
+.parent button.small{min-height:48px;min-width:48px;font-size:16px}
+.card{background:var(--paper);color:var(--ink);border-radius:22px;padding:14px}
+.big{font-size:clamp(44px,12vmin,96px);font-family:var(--kai);line-height:1.1;text-align:center}
+.py{font-size:clamp(16px,3.4vmin,26px);color:#7a4b8f;min-height:1.3em;text-align:center}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto}
+.opts button{background:var(--paper);color:var(--ink);font-size:clamp(26px,6.5vmin,48px);font-family:var(--kai);min-height:clamp(75px,16vh,130px)}
+.opts.sm button{font-size:clamp(18px,4vmin,26px);font-family:var(--zh)}
+.opts.three{grid-template-columns:1fr 1fr 1fr}
+.go{background:var(--lantern);color:#fff;font-size:26px}.gold{background:var(--gold);color:var(--ink)}
+.stage{flex:1;display:flex;flex-direction:column;gap:10px;min-height:0}
+.prompt{display:flex;align-items:center;gap:8px;justify-content:center;font-size:clamp(16px,3.4vmin,24px);text-align:center}
+.dots{display:flex;gap:6px;justify-content:center;padding:4px}.dots i{width:12px;height:12px;border-radius:50%;background:#fff3}.dots i.on{background:var(--gold)}.dots i.done{background:var(--jade)}
+.good{background:var(--jade)!important;color:#fff!important}.try{background:var(--gold)!important;color:var(--ink)!important}
+.frame{display:flex;gap:8px;justify-content:center;align-items:stretch;margin:auto}
+.frame.tb{flex-direction:column;width:min(40vw,200px)}.frame.enc{width:min(46vw,230px);padding:14px;border:6px solid var(--gold);border-radius:12px;background:#fff1}
+.slot{min-width:min(26vw,130px);min-height:min(22vw,110px);border:4px dashed var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:clamp(40px,10vmin,72px);font-family:var(--kai);background:#fff1;color:var(--paper)}
+.slot.f{border-style:solid;background:var(--paper);color:var(--ink)}
+.tiles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}.tiles button{background:var(--paper);color:var(--ink);font-size:clamp(24px,5.5vmin,40px);font-family:var(--kai)}.tiles button[disabled]{opacity:.25}
+.line{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:90px;align-items:center;border-bottom:4px dashed var(--gold);padding-bottom:6px}
+.msg{min-height:2.6em;text-align:center;font-size:clamp(18px,3.8vmin,26px)}
+.note{font-size:15px;opacity:.85;text-align:center}
+.field{display:flex;flex-direction:column;gap:10px;margin:auto 0}.field input{font:inherit;min-height:75px;border-radius:18px;border:4px solid var(--gold);padding:0 16px;font-size:26px;text-transform:uppercase;background:var(--paper);color:var(--ink)}.field input.name{text-transform:none}
+.parent{overflow:auto}.parent table{width:100%;border-collapse:collapse}.parent td{padding:6px;border-bottom:1px solid #0002}
+.xp{background:var(--gold);color:var(--ink);padding:4px 12px;border-radius:99px;font-weight:700}
+.meter{height:16px;background:#fff3;border-radius:9px;overflow:hidden}.meter i{display:block;height:100%;background:var(--gold)}
+.chars{display:inline-flex;gap:.1em;align-items:flex-end}.chars ruby{ruby-position:over}.chars rt{font-size:.28em;font-family:var(--zh);color:#7a4b8f}
+@media (prefers-reduced-motion:no-preference){.pop{animation:pop .25s}@keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}}
+@media (max-height:520px){.big{font-size:clamp(36px,10vmin,64px)}.opts button{min-height:75px}}
