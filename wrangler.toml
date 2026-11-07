@@ -1,0 +1,22 @@
+name = "mandarin-say-it"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mandarin-say-it"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+# Workers AI (Whisper) is used only when a class has voice switched on and no Azure/Google key is set.
+[ai]
+binding = "AI"
+
+[vars]
+AZURE_REGION = "southeastasia"
+SPEECH_LANG = "zh-CN"
+GOOGLE_LANG = "cmn-Hans-CN"
