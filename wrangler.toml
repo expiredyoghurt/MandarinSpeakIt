@@ -10,7 +10,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "mandarin-say-it"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "7d651c6b-b6b7-44ba-90db-d734c0e783b0"
 
 # Workers AI (Whisper) is used only when a class has voice switched on and no Azure/Google key is set.
 [ai]
