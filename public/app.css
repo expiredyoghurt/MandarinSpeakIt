@@ -35,5 +35,15 @@ button.small{min-height:75px;min-width:75px;font-size:20px;border-radius:18px;pa
 .xp{background:var(--gold);color:var(--ink);padding:4px 12px;border-radius:99px;font-weight:700}
 .meter{height:16px;background:#fff3;border-radius:9px;overflow:hidden}.meter i{display:block;height:100%;background:var(--gold)}
 .chars{display:inline-flex;gap:.1em;align-items:flex-end}.chars ruby{ruby-position:over}.chars rt{font-size:.28em;font-family:var(--zh);color:#7a4b8f}
+button.link{background:none;box-shadow:none;min-height:75px;text-decoration:underline;font-size:18px;color:var(--gold)}
+.alt{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:center}
+.foot{text-align:center;font-size:15px;opacity:.75;padding:6px 0}.foot a{color:var(--gold);display:inline-block;padding:14px 6px}
+/* v0.4: pinyin over the app's own Chinese, the title, and the after-answer reveal line */
+ruby{ruby-position:over}rt{font-size:max(.52em,11px);font-family:var(--zh);font-weight:400;letter-spacing:0}
+.title{margin:0;font-weight:700}.title ruby{margin:0 .06em}.title rt{font-size:max(.2em,15px);color:var(--gold);letter-spacing:.02em}
+.reveal{display:flex;justify-content:center;padding:2px 0}.reveal .chars{font-size:clamp(24px,5vmin,36px);font-family:var(--kai)}
+.msg.withrv{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 16px;min-height:0}.reveal rt{font-size:max(.36em,11px)}
+/* short screens (laptops): keep the Next button on screen even with pinyin lines */
+@media (max-height:800px){.stage{gap:4px}.msg{min-height:2em}.note{line-height:1.25}}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .25s}@keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}}
 @media (max-height:520px){.big{font-size:clamp(36px,10vmin,64px)}.opts button{min-height:75px}}

@@ -1,5 +1,7 @@
 // Speech engines, the XP rule and the per-class switches. Mandarin version of the English src/sayit.js.
 import {judge} from '../public/zh-engine.js';
+import {UNITS} from '../public/zh-data.js';
+export const MAXU=UNITS.length-1; // highest unit in the content bank
 
 // ---- XP rule (change here). Same shape as English Say It!, but UNCALIBRATED for Mandarin: tune with real pupil recordings. ----
 export const SAY_CAP=10;          // the most XP a pupil can ever earn from one spoken item
@@ -11,7 +13,7 @@ export const SAY_MAXBYTES=400000; // 3 s of 16 kHz mono 16-bit WAV is about 96 K
 export const sayTier=acc=>acc>=90?10:acc>=80?8:acc>=65?6:acc>=50?4:acc>=25?2:0;
 
 // ---- Per-class switches (classes.settings.zh). on: the whole app. voice: recordings may be sent to a scoring service. pinyin: 'tap' | 'on' | 'off'. unitCap: highest unit this class may reach. ----
-export const zhCfg=set=>{const z=(set&&set.zh)||{},on=z.on!==false;return{on,voice:on&&z.voice===true,pinyin:['tap','on','off'].includes(z.pinyin)?z.pinyin:'tap',unitCap:Math.min(6,Math.max(1,z.unitCap|0||6))}};
+export const zhCfg=set=>{const z=(set&&set.zh)||{},on=z.on!==false;return{on,voice:on&&z.voice===true,pinyin:['tap','on','off'].includes(z.pinyin)?z.pinyin:'tap',unitCap:Math.min(MAXU,Math.max(1,z.unitCap|0||6))}};
 
 // ---- Engines ----
 const ORDER=['azure','google','whisper'];

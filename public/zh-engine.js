@@ -53,6 +53,12 @@ export function compose(o){ // {unit, states, day, voice, seed}
  // a brand-new pupil has little to review: top the session up with more unseen items so it is a real session, newest unit first
  for(const x of sh(fresh).sort((a,b)=>uOf(b)-uOf(a))){if(steps.length>=10||full)break;const sig=x.k+x.key;if(seen.has(sig))continue;seen.add(sig);
   const t=actsFor(x,rng).find(t=>makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}
+ // v0.4: with big newest units, older grammar items (measure words, 的/地/得, opposites) could wait many sessions. If this session has none, add one unseen one from any unit the pupil has reached.
+ if(!full&&!steps.some(x=>x.k==='m'||x.k==='d'||x.k==='o')){const g=sh(fresh.filter(x=>'mdo'.includes(x.k)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
+  if(x){const t=actsFor(x,rng).find(t=>makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}}
+ // same for reduplication (AA, A一A): it rides on words, so an unseen older reduplicated word would otherwise wait behind the newest unit's words
+ if(!full&&!steps.some(x=>x.t==='redup')){const g=sh(fresh.filter(x=>x.k==='w'&&REDUP.some(r=>r.w===x.key)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
+  if(x&&makeItem({t:'redup',key:x.key},u,1))add({...x,blk:'new'},'redup')}
  if(o.voice){const say=sh([...poolWords(u).filter(w=>lv('w',w.w)>=1).map(w=>({k:'w',key:w.w})),...poolSents(u).filter(s=>lv('s',s.id)>=1).map(s=>({k:'s',key:String(s.id)}))]).slice(0,3);
   for(const x of say){if(tot+SECS.say>720)break;tot+=SECS.say;steps.push({...x,blk:'say',t:'say'})}}
  return{steps,secs:tot}}
