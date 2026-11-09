@@ -13,12 +13,14 @@ const LS={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,
 // A teacher preview arrives as #preview=TOKEN. It lives in this tab only and never touches the saved sign-in.
 const PREVIEW_TOK=(location.hash.match(/^#preview=([\w.=+\/-]+)$/)||[])[1]||null;
 if(PREVIEW_TOK)try{history.replaceState(null,'',location.pathname)}catch{}
-const S={tok:PREVIEW_TOK||LS.get('zh_tok'),name:'',guest:false,preview:!!PREVIEW_TOK,xp:0,unit:1,avatar:'',streak:{days:[],run:0},cfg:{voice:false,pinyin:'tap'},consent:false,mute:LS.get('zh_mute')==='1',pinyin:LS.get('zh_pinyin'),young:LS.get('zh_young')};
+const S={level:LS.get('zh_level'),tok:PREVIEW_TOK||LS.get('zh_tok'),focus:null,play:1,name:'',guest:false,preview:!!PREVIEW_TOK,xp:0,unit:1,avatar:'',streak:{days:[],run:0},cfg:{voice:false,pinyin:'tap'},consent:false,mute:LS.get('zh_mute')==='1',pinyin:LS.get('zh_pinyin'),young:LS.get('zh_young')};
 const MAXU=D.UNITS.length-1;
 const h=(t,a={},...k)=>{const e=document.createElement(t);for(const x in a){if(x==='class')e.className=a[x];else if(x.startsWith('on'))e.addEventListener(x.slice(2),a[x]);else if(a[x]!==false&&a[x]!=null)e.setAttribute(x,a[x]===true?'':a[x])}for(const c of k.flat())if(c!=null&&c!==false)e.append(c.nodeType?c:document.createTextNode(c));return e};
 const api=async(p,b,extra={})=>{const r=await fetch(p,{method:b||extra.bin?'POST':'GET',headers:{...(extra.bin?{}:{'content-type':'application/json'}),...(S.tok?{authorization:'Bearer '+S.tok}:{}),...(extra.headers||{})},body:extra.bin||(b?JSON.stringify(b):undefined)});const j=await r.json().catch(()=>({}));return{s:r.status,j}};
 const ping=(ev,ref)=>{if(S.tok&&!S.guest)api('/api/zh/event',{ev,ref}).catch(()=>{})}; // usage counts for the teacher: no content, never blocks the pupil
-const youngOn=()=>S.young==='1'?true:S.young==='0'?false:!!S.cfg.young;
+// learner level: A preschool (pictures and sound), B lower primary, C upper primary. A device setting in the grown-ups area beats the class setting.
+const level=()=>['A','B','C'].includes(S.level)?S.level:S.young==='1'?'B':S.young==='0'?'C':(S.cfg.tier||(S.cfg.young?'B':'C'));
+const youngOn=()=>level()!=='C',isA=()=>level()==='A';
 const pinyinMode=()=>S.pinyin||S.cfg.pinyin||'tap';
 const T=t=>UT(t,pinyinMode()!=='off'); // pinyin over the app's own Chinese (never lesson content)
 const show=(...k)=>{document.body.classList.toggle('young',youngOn());cancelSpeech();
@@ -87,23 +89,25 @@ const streakRow=()=>{const d=S.streak.days&&S.streak.days.length===7?S.streak.da
 async function home(){if(!S.name){const r=await api('/api/zh/me');if(r.s!==200){S.tok=null;saveTok('');return login()}load(r.j)}
  const words=h('div',{class:'note'},'');
  show(h('div',{class:'bar'},h('div',{class:'hello'},S.avatar?h('span',{class:'av','aria-hidden':'true'},S.avatar):null,h('span',{class:'nm'},...T('你好'),', '+S.name+'!')),h('div',{class:'sp'}),h('span',{class:'xp','aria-label':S.xp+' stars'},'⭐ '+S.xp),h('button',{class:'ib sm lockbtn'+(voiceOk?'':' badge'),'aria-label':'Grown-ups',onclick:gate},'🔒')),
-  h('div',{class:'home'},h('div',{class:'unitcard pop'},h('div',{class:'ut'},T('Unit '+S.unit+': '+D.UNITS[S.unit])),unitMap(),words),
+  h('div',{class:'home'},h('div',{class:'unitcard pop'},S.unit>1?h('button',{class:'unitbtn','aria-label':'Practise a unit. You are in unit '+S.unit+'.',onclick:unitPicker},h('span',{class:'ut'},...T('Unit '+S.unit+': '+D.UNITS[S.unit])),h('span',{class:'caret','aria-hidden':'true'},'▾')):h('div',{class:'ut'},T('Unit '+S.unit+': '+D.UNITS[S.unit])),unitMap(),words),
    streakRow(),
    S.guest?h('div',{class:'card'},h('div',{class:'note'},T('You are playing as a guest. Your teacher cannot see your progress yet. 你现在是客人。')),h('button',{class:'gold',style:'width:100%;margin-top:8px',onclick:()=>join()},T('Join my class 加入班级'))):null,
-   h('div',{class:'tools'},h('button',{class:'gold',onclick:finder},...T('部首 Radical finder')),pinBtn(),muteBtn()),
+   h('div',{class:'tools'},isA()?null:h('button',{class:'gold',onclick:finder},...T('部首 Radical finder')),isA()?null:pinBtn(),muteBtn()),
    h('button',{class:'play',onclick:play},T('▶ Play 开始玩')),
    S.cfg.voice&&S.consent?h('div',{class:'note'},'🎤 Speaking practice is on.'):null));
  api('/api/zh/progress').then(r=>{if(r.s===200&&words.isConnected)words.textContent='🌟 '+r.j.met.length+' words met'})}
+// v0.8: practise any unit already reached. Progress and the saved unit do not change.
+function unitPicker(){show(h('div',{class:'bar'},back(home),h('div',{class:'lede'},...T('单元 Practise a unit'))),stage(h('div',{class:'ulist',role:'list'},Array.from({length:S.unit},(_,i)=>S.unit-i).map(n=>h('button',{role:'listitem',class:n===S.unit?'now':'',onclick:()=>{S.focus=n;play()}},h('b',{},n===S.unit?'▶ '+n:String(n)),h('span',{lang:'zh'},...T(D.UNITS[n])))))))}
 async function finder(){ping('finder');const r=await api('/api/zh/progress');const prog=r.s===200?{mastered:new Set(r.j.mastered),met:new Set(r.j.met)}:{mastered:new Set(),met:new Set()};
  const fr=radicalFinder({maxUnit:S.unit,unit:S.unit,pinyin:pinyinMode()==='on'?'on':'tap',young:youngOn(),progress:prog,speak:w=>speak(w,undefined,true),onEvent:ping,report:reportMeaning,embedded:true});
  show(h('div',{class:'bar'},back(()=>{if(!fr.pop())home()}),h('div',{class:'lede'},...T('部首 Radical finder'))),h('div',{class:'stage',style:'min-height:0;flex:1'},fr))}
 const reportMeaning=(word,reason)=>api('/api/zh/report',{word,reason});
 
 // ---- Play: a composed session, one item per screen ----
-async function play(){E.setYoung(youngOn());const r=await api('/api/zh/session',{young:youngOn()?1:0});if(r.s!==200)return home();const steps=r.j.steps;if(!steps.length)return done(0);
+async function play(){E.setYoung(youngOn());const focus=S.focus;S.focus=null;const r=await api('/api/zh/session',{young:youngOn()?1:0,tier:level(),...(focus?{focus}:{})});if(r.s!==200)return home();const steps=r.j.steps;S.play=r.j.unit;if(!steps.length)return done(0);
  let i=0,right=0;
  const next=async()=>{if(i>=steps.length)return done(right);const st=steps[i],seed=(Math.random()*1e9)|0,
-   item=st.t==='say'?{t:'say',k:st.k,key:st.key,text:D.sayItem(st.k,st.key).text}:E.makeItem(st,S.unit,seed);
+   item=st.t==='say'?{t:'say',k:st.k,key:st.key,text:D.sayItem(st.k,st.key).text}:E.makeItem(st,S.play,seed);
   if(!item){i++;return next()}
   const body=h('div',{class:'stage'}),lanterns=h('div',{class:'lanterns',role:'img','aria-label':'Question '+(i+1)+' of '+steps.length},steps.map((_,j)=>h('i',{class:j<i?'done':j===i?'on':''})));window.__zhItem={item,st};
   show(h('div',{class:'bar'},h('button',{class:'ib sm','aria-label':'Stop for now',onclick:()=>askStop(home)},'✕'),lanterns,muteBtn()),body);
@@ -116,11 +120,11 @@ async function play(){E.setYoung(youngOn());const r=await api('/api/zh/session',
    setTimeout(()=>{if(!body.isConnected)return;body.classList.add('done');
     body.append(sheetEl(ok,info,async()=>{await posted;i++;next()}));
     const plain=info.word||null;say(ok?PRAISE:AGAIN,plain)},item.t==='say'?0:420)};
-  RENDER[item.t](item,body,finish,st)};
+  RENDER[item.t](item,body,finish,st,()=>{i++;next()})};
  next()}
 function sheetEl(ok,info,onNext){const w=info.word,wb=w&&D.BYW[w]?D.BYW[w]:null;
  const word=w?h('div',{class:'word',lang:'zh'},wb&&wb.emo?h('span',{class:'emo','aria-hidden':'true'},wb.emo):null,(()=>{const c=chars(w,D.pyChars(w));c.draw(pinyinMode()!=='off');return c})()):null;
- const row=w?h('div',{class:'row'},word,h('button',{class:'ib','aria-label':'Listen',onclick:()=>replay(null,w)},'🔊'),wb?h('button',{class:'ib','aria-label':'Meaning',onclick:e=>{ping('mean',w);openWordCard(w,{pinyin:pinyinMode(),opener:e.currentTarget,speak:x=>speak(x,undefined,true),report:reportMeaning})}},'📖'):null):null;
+ const row=w?h('div',{class:'row'},word,h('button',{class:'ib','aria-label':'Listen',onclick:()=>replay(null,w)},'🔊'),wb&&!isA()?h('button',{class:'ib','aria-label':'Meaning',onclick:e=>{ping('mean',w);openWordCard(w,{pinyin:pinyinMode(),opener:e.currentTarget,speak:x=>speak(x,undefined,true),report:reportMeaning})}},'📖'):null):null;
  return h('div',{class:'sheet'+(ok?'':' again'),role:'status'},h('div',{class:'verdict'},...T(ok?'好棒! Great!':'再试一试。 Good try!')),row,info.note?h('div',{class:'note'},info.note):null,h('button',{class:'next',onclick:onNext},...T('Next 下一个 ▶')))}
 function askStop(onStop){const m=h('div',{class:'modal'},h('div',{class:'sheet again',role:'dialog','aria-modal':'true','aria-label':'Stop for now?'},h('div',{class:'verdict'},...T('休息一下? Take a break?')),
   h('button',{class:'go',onclick:()=>m.remove()},'Keep playing'),h('button',{class:'gold',onclick:()=>{m.remove();onStop()}},...T('Home 回家'))));app.append(m);m.querySelector('button').focus()}
@@ -135,6 +139,13 @@ const pytap=wrapEl=>pinyinMode()==='tap'?h('button',{class:'gold',onclick:e=>{wr
 const answers=(...k)=>h('div',{class:'answers'},...k);
 
 const RENDER={
+ // Preschool (level A). Meet a word: a big picture, the word is spoken, tap the picture to hear it again. Nothing to read.
+ meet(it,body,finish,st,adv){const c=chars(it.word,D.pyChars(it.word));c.draw(true);
+  scene(body,'看一看,听一听。','Look and listen.',[TASK.meet,it.say],[h('button',{class:'emojibtn','aria-label':'Listen to '+it.word,onclick:()=>replay(null,it.say)},it.emoji),h('div',{class:'big small',lang:'zh'},c),h('div',{class:'hint'},it.en)]);
+  body.append(answers(h('button',{class:'go',onclick:adv},...T('Next 下一个 ▶'))))},
+ // Preschool: hear the word, tap the right picture
+ tap(it,body,finish){scene(body,'听一听,哪一个?','Listen. Which one?',[TASK.tap,it.say],[h('div',{class:'emoji','aria-hidden':'true'},'👂')]);
+  const row=h('div',{class:'opts three pics'},it.options.map(o=>h('button',{'aria-label':'picture',onclick:e=>{const b=e.currentTarget,ok=o===it.answer;b.classList.add(ok?'good':'try');if(!ok)[...row.children].forEach(c=>{if(c.textContent===it.answer)c.classList.add('good')});finish(ok,{word:it.word})}},o)));body.append(answers(row))},
  pick(it,body,finish){
   if(it.mode==='py'){const c=chars(it.show);c.draw(false);scene(body,'哪个拼音对?','Which pinyin is right?',[TASK.py,it.show],[h('div',{class:'big'},c)]);choose(it,body,ok=>finish(ok,{word:it.show}),it.options,v=>v===it.answer,'sm')} // never show the pinyin before the answer here
   else if(it.mode==='hear'){scene(body,'听一听,是哪个词?','Listen. Which word?',[TASK.hear,it.say],[h('div',{class:'emoji','aria-hidden':'true'},'👂')]);choose(it,body,ok=>finish(ok,{word:it.answer}),it.options,v=>v===it.answer)}
@@ -191,7 +202,7 @@ function sayScreen(it,body,finish){const c=chars(it.text),msg=h('div',{class:'ms
 function gate(){const a=3+Math.floor(Math.random()*6),b=4+Math.floor(Math.random()*5),inp=h('input',{type:'number',inputmode:'numeric','aria-label':'Answer',style:'min-height:75px;font-size:28px;border-radius:16px;padding:0 12px;border:4px solid var(--gold)'});
  show(h('div',{class:'bar'},back(home)),stage(h('div',{class:'lede'},'Grown-ups only. What is '+a+' × '+b+'?'),inp,h('button',{class:'go',onclick:()=>+inp.value===a*b?parent():home()},'OK')))}
 function parent(){const c=h('input',{type:'checkbox',style:'width:32px;height:32px'});c.checked=S.consent;
- const ysel=h('select',{style:'font-size:20px;min-height:48px'},[['','Use the class setting'],['1','Younger learners (ages 6 to 9)'],['0','Standard']].map(([v,t])=>h('option',{value:v,selected:(S.young||'')===v},t)));ysel.onchange=()=>{S.young=ysel.value||null;LS.set('zh_young',ysel.value);document.body.classList.toggle('young',youngOn())};
+ const ysel=h('select',{style:'font-size:20px;min-height:48px'},[['','Use the class setting'],['A','Preschool (pictures and sound)'],['B','Lower primary (ages 6 to 9)'],['C','Upper primary']].map(([v,t])=>h('option',{value:v,selected:(S.level||'')===v},t)));ysel.onchange=()=>{S.level=ysel.value||null;LS.set('zh_level',ysel.value);S.young=null;LS.set('zh_young','');document.body.classList.toggle('young',youngOn())};
  const sel=h('select',{style:'font-size:20px;min-height:48px'},[['','Use the class setting'],['on','Always show pinyin'],['tap','Tap to show pinyin'],['off','Never show pinyin']].map(([v,t])=>h('option',{value:v,selected:(S.pinyin||'')===v},t)));sel.onchange=()=>{S.pinyin=sel.value||null;LS.set('zh_pinyin',sel.value)};
  c.onchange=async()=>{S.consent=(await api('/api/zh/consent',{yes:c.checked})).j.consent};
  const rows=D.WORDS.filter(w=>w.u<=S.unit).map(w=>h('tr',{},h('td',{},w.w),h('td',{},D.pyChars(w.w).join(' ')),h('td',{},D.pyChars(w.w).map(sy=>E.CONTOUR[D.stripTone(sy).tone]).join(' ')),h('td',{},h('button',{class:'ib sm','aria-label':'Listen to '+w.w,style:'min-height:48px;min-width:48px;width:48px;font-size:20px',onclick:()=>speak(w.w,undefined,true)},'🔊'))));

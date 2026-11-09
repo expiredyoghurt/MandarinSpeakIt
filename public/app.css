@@ -97,10 +97,10 @@ button.link{background:none;box-shadow:none;min-height:75px;text-decoration:unde
 .home{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
 .unitcard{background:var(--paper);color:var(--ink);border-radius:24px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .unitcard .ut{font-size:clamp(20px,4.2vmin,26px);font-weight:700;line-height:1.7}
-.map{display:grid;grid-template-columns:repeat(5,1fr);gap:8px 6px;list-style:none;margin:0;padding:0}
+.map{--stop:clamp(40px,11vw,52px);display:grid;grid-template-columns:repeat(5,1fr);gap:8px 6px;list-style:none;margin:0;padding:0}
 .map li{display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;font-size:13px;color:var(--mute);font-weight:700}
-.map li b{width:clamp(40px,11vw,52px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#d9cfee;color:var(--mute)}
-.map li::after{content:"";position:absolute;top:calc(clamp(40px,11vw,52px)/2);left:calc(50% + clamp(20px,5.5vw,26px));right:calc(-50% + clamp(20px,5.5vw,26px));height:4px;background:#d9cfee;z-index:0}
+.map li b{width:var(--stop);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-size:18px;background:#d9cfee;color:var(--mute)}
+.map li::after{content:"";position:absolute;top:calc(var(--stop)/2);left:calc(50% + var(--stop)/2);right:calc(-50% + var(--stop)/2);height:4px;background:#d9cfee;z-index:0}
 .map li:nth-child(5n)::after,.map li:last-child::after{display:none}
 .map li b{position:relative;z-index:1}
 .map li.done b{background:var(--gold);color:var(--ink)}.map li.done::after{background:var(--gold)}
@@ -139,3 +139,19 @@ body.young rt{font-size:max(.6em,13px)}
 .gold rt,.sheet .gold rt{color:var(--mute)}.go rt,.sheet .next rt,.chk rt,.play rt{color:#fff}
 .unitcard .note,.unitcard .mute{color:var(--mute)}
 .stage.done .hero{padding-bottom:4px}
+
+/* ---- v0.8: unit picker, preschool screens ---- */
+.unitbtn{display:flex;align-items:center;gap:8px;width:100%;background:#f1e7cf;color:var(--ink);box-shadow:none;border-radius:16px;text-align:left;min-height:75px;padding:4px 12px}
+.unitbtn .ut{flex:1;font-size:clamp(18px,4vmin,24px);font-weight:700;line-height:1.7}.unitbtn .caret{font-size:26px;color:var(--mute)}
+.ulist{display:flex;flex-direction:column;gap:10px;overflow:auto;flex:1;min-height:0;padding:2px 2px 12px}
+.ulist button{background:var(--paper);color:var(--ink);display:flex;align-items:center;gap:14px;text-align:left;font-size:20px;font-weight:600;justify-content:flex-start}
+.ulist button b{min-width:44px;font-size:26px;color:var(--lantern)}.ulist button.now{outline:4px solid var(--gold);outline-offset:-4px}
+.emojibtn{background:none;box-shadow:none;font-size:clamp(100px,30vmin,200px);line-height:1;padding:0;min-height:75px;min-width:75px;border-radius:40px}
+.big.small{font-size:clamp(36px,8vmin,60px)}
+.opts.pics button{font-size:clamp(56px,14vmin,96px);min-height:clamp(110px,22vh,170px);font-family:system-ui,"Apple Color Emoji","Noto Color Emoji",sans-serif}
+@media (max-height:700px){.map{--stop:32px;gap:4px 6px}.map li b{font-size:15px}.unitcard{padding:8px 12px;gap:4px}.opts.pics button{min-height:96px}.emojibtn{font-size:clamp(80px,24vmin,130px)}}
+/* v0.8 fixes: specificity for picture answers, picker rows */
+#app .opts.pics button{font-size:clamp(56px,14vmin,96px);line-height:1}
+.ulist button span{line-height:1.9;display:block}
+.ulist button b{align-self:center}
+.ulist button{min-height:84px}

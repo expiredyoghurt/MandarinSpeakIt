@@ -31,3 +31,7 @@ The handoff worried about `#6b5a8a` on `#fff6e0`: it measured 5.6, so it already
 ## Not verified
 - Real children (see item 1). Real Chinese voices: the tests use a pretend voice. Real iPad Safari. Speaking practice with a live engine (unchanged since v0.6).
 - Younger-learner screens were checked for layout, not for whether a 6 year old understands the task audio.
+
+## v0.8 additions
+- Tier A screens reuse the v0.7 layout: task bar with 🔊, hero, answers, sheet. Meet: giant emoji, characters, pinyin, English, one big Next. Tap: three picture buttons (min 110px tall, emoji 56-96px). The sheet hides the 📖 button at Tier A.
+- Unit picker: a 75px row on the home card opens a full-screen list (newest unit first). At heights under 700px the unit map shrinks to 32px stops to keep Play on screen (tested at 360x640).

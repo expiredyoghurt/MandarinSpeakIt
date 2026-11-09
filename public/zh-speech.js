@@ -18,5 +18,5 @@ export function speakParts(parts,{rate=.85,onend}={}){if(!ok()){onend&&onend();r
 // What is said for each kind of feedback (kept short; the sheet also shows it)
 export const PRAISE='好棒!',AGAIN='再试一次。';
 // Spoken form of each task, by activity. The screen shows the same words with pinyin (see app.js).
-export const TASK={py:'哪个拼音对?',hear:'听一听,是哪个词?',emoji:'这是什么?',odd:'哪一个不一样?',build:'把字拼起来。',part:'哪一部分表示意思?',type:'这个词怎么组成?',measure:'选量词。',dde:'选一个。',order:'把词语排好。',strokes:'一共几画?',opp:'反义词是哪个?',pattern:'这个词是什么重叠?',make:'选一个。',say:'大声读。'};
+export const TASK={meet:'看一看,听一听。',tap:'听一听,哪一个?',py:'哪个拼音对?',hear:'听一听,是哪个词?',emoji:'这是什么?',odd:'哪一个不一样?',build:'把字拼起来。',part:'哪一部分表示意思?',type:'这个词怎么组成?',measure:'选量词。',dde:'选一个。',order:'把词语排好。',strokes:'一共几画?',opp:'反义词是哪个?',pattern:'这个词是什么重叠?',make:'选一个。',say:'大声读。'};
 export default {speechSupported,checkVoice,cancelSpeech,speakParts,TASK,PRAISE,AGAIN};

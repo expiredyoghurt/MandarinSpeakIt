@@ -29,7 +29,25 @@ export const offered=(k,key,u)=>{
 const SECS={strokes:20,sort:35,redup:25,opp:20,pick:20,odd:25,build:40,part:25,share:25,type:25,measure:25,order:45,dde:25,say:30};
 let YOUNG=false;export const setYoung=b=>{YOUNG=!!b};
 const YSKIP=new Set(['type','dde','redup','strokes']);
-export function makeItem(spec,unit,seed){const it=makeItem0(spec,unit,seed);if(YOUNG&&it&&Array.isArray(it.options)&&it.options.length===4&&typeof it.answer==='string'&&['pick','odd','share','part'].includes(it.t)){const i=it.options.findIndex(o=>(o.value??o)!==it.answer);if(i>=0)it.options=it.options.filter((_,j)=>j!==i)}return it}
+// ---- v0.8 Tier A (preschool): picture words only. A pupil hears a word and taps the right picture; no reading. ----
+export const poolPics=u=>WORDS.filter(w=>w.emo&&w.u<=u);
+// "known" is gentler than mastered(): three or more tries, on two different days, and at least 3 of the last 4 right
+export const knownA=st=>!!st&&st.h.length>=3&&new Set(st.d).size>=2&&st.h.slice(-4).reduce((a,b)=>a+b,0)>=3;
+export function composeA(o){const rng=mulberry(o.seed|0),sh=a=>[...a].sort(()=>rng()-.5),S=o.states||new Map(),pool=poolPics(o.unit),st=w=>S.get('w:'+w.w);
+ const lv=w=>{const s=st(w);return !s||!s.h.length?0:knownA(s)?2:1},due=w=>{const s=st(w);return !!s&&s.h.length>0&&s.due<=o.day};
+ const dueL=sh(pool.filter(due)).slice(0,3),taken=new Set(dueL);
+ const newL=sh(pool.filter(w=>lv(w)===0&&!taken.has(w))).sort((a,b)=>b.u-a.u).slice(0,3);newL.forEach(w=>taken.add(w));
+ const learn=sh(pool.filter(w=>lv(w)===1&&!taken.has(w))).slice(0,3);learn.forEach(w=>taken.add(w));
+ const fill=sh(pool.filter(w=>lv(w)===2&&!taken.has(w))).slice(0,Math.max(0,8-taken.size));
+ const steps=[],add=(w,t,blk)=>{if(steps.length<12)steps.push({k:'w',key:w.w,t,blk})};
+ for(const w of newL){add(w,'meet','new');add(w,'tap','new')}
+ for(const w of [...dueL,...learn,...fill])add(w,'tap',dueL.includes(w)?'review':'practice');
+ return{steps:steps.filter(s=>s.t==='meet'||makeItem(s,o.unit,1)),secs:steps.length*18}}
+function makePic(spec,unit,seed){const w=D.BYW[spec.key];if(!w||!w.emo)return null;if(spec.t==='meet')return{t:'meet',word:w.w,emoji:w.emo,py:w.py,en:w.en,say:w.w};
+ const rng=mulberry(seed|0),sh=a=>[...a].sort(()=>rng()-.5),pool=poolPics(unit).filter(x=>x.w!==w.w&&x.emo!==w.emo),same=sh(pool.filter(x=>x.u===w.u)),rest=sh(pool.filter(x=>x.u!==w.u)),opts=[],seen=new Set([w.emo]);
+ for(const x of [...same,...rest]){if(opts.length>=2)break;if(!seen.has(x.emo)){seen.add(x.emo);opts.push(x.emo)}}
+ if(opts.length<2)return null;return{t:'tap',word:w.w,answer:w.emo,options:sh([w.emo,...opts]),say:w.w,py:w.py,en:w.en}}
+export function makeItem(spec,unit,seed){if(spec.t==='meet'||spec.t==='tap')return makePic(spec,unit,seed);const it=makeItem0(spec,unit,seed);if(YOUNG&&it&&Array.isArray(it.options)&&it.options.length===4&&typeof it.answer==='string'&&['pick','odd','share','part'].includes(it.t)){const i=it.options.findIndex(o=>(o.value??o)!==it.answer);if(i>=0)it.options=it.options.filter((_,j)=>j!==i)}return it}
 export function compose(o){ // {unit, states, day, voice, seed, young}
  YOUNG=!!o.young;
  const rng=mulberry(o.seed|0),sh=a=>[...a].sort(()=>rng()-.5),S=o.states||new Map(),u=o.unit,steps=[];
@@ -168,4 +186,4 @@ export function judge(target,alts){
  return{result,acc:best.acc,per:best.per,hint:result==='correct'?-1:worst,heard:best.heard}}
 // Simple tone contour for the grown-ups' "hear the tones" view (5 = neutral)
 export const CONTOUR={1:'¯',2:'↗',3:'↘↗',4:'↘',5:'·'};
-export default {setYoung,poolOpp,checkSort,BOXES,blank,update,mastered,level,mulberry,poolChars,poolWords,poolSents,poolMeasures,poolDde,offered,compose,makeItem,checkBuild,checkOrder,checkPick,judge,sylScore,CONTOUR,CJK,retone};
+export default {poolPics,knownA,composeA,setYoung,poolOpp,checkSort,BOXES,blank,update,mastered,level,mulberry,poolChars,poolWords,poolSents,poolMeasures,poolDde,offered,compose,makeItem,checkBuild,checkOrder,checkPick,judge,sylScore,CONTOUR,CJK,retone};

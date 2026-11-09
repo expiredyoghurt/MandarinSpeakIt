@@ -1,4 +1,4 @@
-# Speak Mandarin 讲华语 (jiǎng huáyǔ), v0.7.0 (repo name: Mandarin Say It!)
+# Speak Mandarin 讲华语 (jiǎng huáyǔ), v0.8.0 (repo name: Mandarin Say It!)
 
 A browser app for Singapore primary pupils learning Chinese as a second language (built first for **Tier C: P5-P6 Foundation Chinese**).
 Pupils can sign in, make their own account with just the class code (if the teacher allows it), or play as a guest and join a class later.
@@ -42,6 +42,13 @@ Run only the numbered files in `migrations/` that a release note lists, in the D
 ## Files
 `public/zh-data.js` content bank · `public/zh-engine.js` mastery, session composer, activities, the Mandarin judge · `src/speech.js` engines, XP rule · `src/worker.js` routes · `tests/` (see build-tools zip).
 **Cache busting:** after ANY change in `public/`, run `node build/stamp.mjs` (in the build-tools zip). It writes a content-hash import map into index, radicals and teacher pages. `node tests/content.test.mjs` fails if it is out of date.
+
+## v0.8.0: learner levels, unit picker, corrections sheet (NO new migration)
+- **Learner level per class** (teacher page, "Learner level"): A preschool, B lower primary, C upper primary. B is the old "younger learners" mode; old classes with that box ticked become B automatically. A is new: pupils see a picture and hear the word (meet), then hear a word and tap one of three pictures (tap). Only words with a picture are used (254 words, 193 distinct pictures); no new content words were added. Pupils at A never see the meaning card or the radical finder.
+- **Unit picker**: pupils above unit 1 tap their unit on the home card to practise any earlier unit. Practice sessions do not move the pupil's level.
+- **Streak**: a day counts after 5 answers (was 1).
+- **Corrections**: the teacher page can download `meaning-corrections.tsv` from the reports list. Fill `new_definition`, run `python3 build/apply_corrections.py file.tsv`, then `python3 build/make_gloss.py` and `node build/stamp.mjs`, and redeploy. New pinyin is generated from the definition; the new_pinyin column is not applied.
+- Upgrading from v0.7: deploy only; migration 002 must already be applied.
 
 ## v0.7.0: a new pupil interface, audio first, picture login (needs migration 002)
 Built after pupils tried v0.6 and the screens felt rough. Detail and decisions in `docs/UI_NOTES_v0.7.md`.

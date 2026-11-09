@@ -12,7 +12,7 @@ export const UIPY={
  '一共几画':'yígòng jǐ huà','这个词是什么重叠':'zhège cí shì shénme chóngdié','这个词怎么组成':'zhège cí zěnme zǔchéng','哪个字也有':'nǎge zì yě yǒu','点出所有有':'diǎn chū suǒyǒu yǒu','哪个是':'nǎge shì','都有':'dōu yǒu','的字':'de zì','画':'huà',
  '没关系':'méi guānxi','差不多':'chàbuduō','再试一试':'zài shì yi shì','再听一听':'zài tīng yi tīng','休息一下':'xiūxi yíxià','今天到这里':'jīntiān dào zhèlǐ','个好答案':'gè hǎo dá’àn','声旁只是线索':'shēngpáng zhǐshì xiànsuǒ',
  '复习':'fùxí','练习':'liànxí','大约十二分钟':'dàyuē shí’èr fēnzhōng','的 地 得':'de dì de','选一个':'xuǎn yí gè',
- '字':'zì','词':'cí','我会的字':'wǒ huì de zì','全部部首':'quánbù bùshǒu','带这个部分的字':'dài zhège bùfen de zì','点你的图片':'diǎn nǐ de túpiàn','选三张图':'xuǎn sān zhāng tú','我记住了':'wǒ jìzhù le','换一个班':'huàn yí gè bān','用名字':'yòng míngzi','图片登录':'túpiàn dēnglù',
+ '看一看':'kàn yi kàn','哪一个':'nǎ yí gè','单元':'dānyuán','字':'zì','词':'cí','我会的字':'wǒ huì de zì','全部部首':'quánbù bùshǒu','带这个部分的字':'dài zhège bùfen de zì','点你的图片':'diǎn nǐ de túpiàn','选三张图':'xuǎn sān zhāng tú','我记住了':'wǒ jìzhù le','换一个班':'huàn yí gè bān','用名字':'yòng míngzi','图片登录':'túpiàn dēnglù',
  '家人':'jiārén','自然':'zìrán','食物':'shíwù','动物':'dòngwù','青字家族':'qīngzì jiāzú','说话学习':'shuōhuà xuéxí','地方出行':'dìfang chūxíng','自然食物':'zìrán shíwù','时间衣物玩乐':'shíjiān yīwù wánlè'};
 const KEYS=Object.keys(UIPY).sort((a,b)=>[...b].length-[...a].length);
 const CJK=/[㐀-鿿]/;

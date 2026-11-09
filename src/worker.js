@@ -12,7 +12,7 @@ const sign=async(env,p)=>{const m=btoa(JSON.stringify(p));return m+'.'+await hma
 async function verify(env,t){try{const[m,s]=t.split('.');return s===await hmac(env.SECRET,m)?JSON.parse(atob(m)):null}catch{return null}}
 async function pbkdf(pw,salt){const k=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);return b64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:enc.encode(salt),iterations:100000},k,256))}
 const dayNo=now=>Math.floor((now+28800)/86400); // Singapore days
-const KINDS=new Set(['c','w','m','s','d','o']),ACTS=new Set(['pick','odd','build','part','share','type','measure','order','dde','redup','opp','sort','strokes']);
+const KINDS=new Set(['c','w','m','s','d','o']),ACTS=new Set(['tap','pick','odd','build','part','share','type','measure','order','dde','redup','opp','sort','strokes']);
 const CODE_ALPHA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Guests are ordinary pupils kept under a reserved class code that no teacher can own (real codes never start with an underscore).
 const GUEST='_GUEST',GUEST_KEEP_DAYS=30;
@@ -27,6 +27,11 @@ const putState=(DB,id,kind,key,st,now)=>DB.prepare('insert into zh_state(student
 // Advance a pupil to the next unit when 70% of the current unit's characters are mastered (a guess to calibrate), never past the class cap.
 async function maybeAdvance(DB,id,pf,cap){let u=pf.unit,moved=false;const S=await states(DB,id);
  while(u<Math.min(MAXU,cap)){const cs=D.UNIT_ITEMS(u).chars;if(!cs.length)break;const m=cs.filter(c=>E.mastered(S.get('c:'+c.c))).length;if(m/cs.length>=.7){u++;moved=true}else break}
+ if(moved)await DB.prepare('update zh_prof set unit=?,upd=? where student_id=?').bind(u,Math.floor(Date.now()/1000),id).run();return{unit:u,moved}}
+
+// Tier A moves on when 70% of the picture words in the unit are "known" (see knownA in zh-engine.js)
+async function maybeAdvanceA(DB,id,pf,cap){let u=pf.unit,moved=false;const S=await states(DB,id);
+ while(u<Math.min(MAXU,cap)){const ws=D.WORDS.filter(w=>w.emo&&w.u===u);if(!ws.length){u++;moved=true;continue}const k=ws.filter(w=>E.knownA(S.get('w:'+w.w))).length;if(k/ws.length>=.7){u++;moved=true}else break}
  if(moved)await DB.prepare('update zh_prof set unit=?,upd=? where student_id=?').bind(u,Math.floor(Date.now()/1000),id).run();return{unit:u,moved}}
 
 // One slot per voice submission, claimed first and checked after, so a burst cannot get through (same rule as English Say It!).
@@ -72,9 +77,9 @@ async function fillPics(DB,code){const rows=(await DB.prepare('select id from st
  const used=new Set((await DB.prepare('select avatar from students where code=? and avatar is not null').bind(code).all()).results.map(r=>r.avatar));
  for(const r of rows){const free=AVATARS.filter(a=>!used.has(a)),pool=free.length?free:AVATARS,av=pool[Math.floor(rnd()*pool.length)];used.add(av);
   await DB.prepare('update students set avatar=coalesce(avatar,?),pic=coalesce(pic,?) where id=?').bind(av,picKey(randomPic(rnd)),r.id).run()}}
-const FAIL_MAX=5,FAIL_WINDOW=600;
+const FAIL_MAX=5,FAIL_WINDOW=600,STREAK_MIN=5; // a lantern is lit for a day with at least 5 answers (a short session)
 // Days played in the last week (oldest first) and the run of days in a row ending today (or yesterday, so the streak is not lost before today's session).
-async function streakOf(DB,id,today){const rows=(await DB.prepare('select distinct day from zh_log where student_id=? and day>=?').bind(id,today-59).all()).results,have=new Set(rows.map(r=>r.day));
+async function streakOf(DB,id,today){const rows=(await DB.prepare('select day from zh_log where student_id=? and day>=? group by day having count(*)>=?').bind(id,today-59,STREAK_MIN).all()).results,have=new Set(rows.map(r=>r.day));
  const days=Array.from({length:7},(_,i)=>have.has(today-6+i));let run=0,d=have.has(today)?today:today-1;while(have.has(d)){run++;d--}return{days,run}}
 const EVENTS=new Set(['mean','finder']),REASONS=new Set(['meaning','pinyin','hard','other']);
 
@@ -111,7 +116,7 @@ export default{async fetch(req,env){
  // ---- Login, join, guest ----
  // What every sign-in returns. Guests get the default room with voice off (voice needs a class and a grown-up's yes).
  const enter=async(s,code,extra={})=>{const set=await classSettings(D_,baseCode(code)),cfg=zhCfg(set),pf=await prof(D_,s.id),g=code===GUEST;
-  return{tok:await sign(env,{r:'s',id:s.id,code}),name:g?'Guest':s.name,guest:g,code:g?'':code,xp:s.xp|0,unit:Math.min(pf.unit,cfg.unitCap),cfg:{voice:g?false:cfg.voice,pinyin:cfg.pinyin,young:cfg.young},consent:g?false:!!pf.consent,avatar:s.avatar||'',preview:String(code).startsWith(PREVIEW),streak:await streakOf(D_,s.id,dayNo(Math.floor(Date.now()/1000))),...extra}};
+  return{tok:await sign(env,{r:'s',id:s.id,code}),name:g?'Guest':s.name,guest:g,code:g?'':code,xp:s.xp|0,unit:Math.min(pf.unit,cfg.unitCap),cfg:{voice:g?false:cfg.voice,pinyin:cfg.pinyin,young:cfg.young,tier:cfg.tier},consent:g?false:!!pf.consent,avatar:s.avatar||'',preview:String(code).startsWith(PREVIEW),streak:await streakOf(D_,s.id,dayNo(Math.floor(Date.now()/1000))),...extra}};
  // A class that a pupil may join by themselves: it exists, the Chinese room is on, and the teacher has the sign-up switch on.
  const joinable=async code=>{if(!code||code===GUEST)return{err:'Unknown class code',s:404};if(!await D_.prepare('select 1 from classes where code=?').bind(code).first())return{err:'Unknown class code',s:404};
   const set=await classSettings(D_,code);if(!zhCfg(set).on)return{err:'This class is not using the Chinese room.',s:403};
@@ -162,7 +167,7 @@ export default{async fetch(req,env){
    for(let i=0;i<6;i++){const code=Array.from(crypto.getRandomValues(new Uint8Array(5)),x=>CODE_ALPHA[x%CODE_ALPHA.length]).join('');
     try{await D_.prepare('insert into classes(code,name,teacher_id,settings) values(?,?,?,?)').bind(code,name,a.id,JSON.stringify({enrol:'closed',zh:{unitCap:MAXU}})).run();return J({code})}catch{}}return J({error:'Try again'},500)}
   if(p==='/api/teacher/settings'){const c=await own(b.code);if(!c)return J({error:'Not your class'},403);const s=JSON.parse(c.settings||'{}'),z=b.zh||{};
-   s.zh={...(s.zh||{}),...(z.on!==undefined?{on:!!z.on}:{}),...(z.voice!==undefined?{voice:!!z.voice}:{}),...(z.young!==undefined?{young:!!z.young}:{}),...(z.login?{login:z.login==='picture'?'picture':'name'}:{}),...(z.pinyin?{pinyin:z.pinyin}:{}),...(z.unitCap?{unitCap:z.unitCap|0}:{})};if(b.enrol)s.enrol=b.enrol==='closed'?'closed':'open';
+   s.zh={...(s.zh||{}),...(z.on!==undefined?{on:!!z.on}:{}),...(z.voice!==undefined?{voice:!!z.voice}:{}),...(z.young!==undefined?{young:!!z.young}:{}),...(['A','B','C'].includes(z.tier)?{tier:z.tier,young:z.tier==='B'}:{}),...(z.login?{login:z.login==='picture'?'picture':'name'}:{}),...(z.pinyin?{pinyin:z.pinyin}:{}),...(z.unitCap?{unitCap:z.unitCap|0}:{})};if(b.enrol)s.enrol=b.enrol==='closed'?'closed':'open';
    await D_.prepare('update classes set settings=? where code=?').bind(JSON.stringify(s),c.code).run();if(zhCfg(s).login==='picture')await fillPics(D_,c.code);return J({cfg:zhCfg(s)})}
   if(p==='/api/teacher/students'){const c=await own(u.searchParams.get('code'));if(!c)return J({error:'Not your class'},403);
    const ss=(await D_.prepare('select s.id,s.name,s.xp,coalesce(z.unit,1) unit,coalesce(z.consent,0) consent from students s left join zh_prof z on z.student_id=s.id where s.code=? order by s.name').bind(c.code).all()).results;
@@ -211,7 +216,7 @@ export default{async fetch(req,env){
   const isGuest=st.code===GUEST,isPrev=st.code.startsWith(PREVIEW),set=await classSettings(D_,baseCode(st.code)),cfg=zhCfg(set);if(!cfg.on)return J({error:'off',off:1},403);a={...a,code:st.code}; // the stored class decides, never the token's
   if(isGuest||isPrev)cfg.voice=false;
   const pf=await prof(D_,a.id),unit=Math.min(pf.unit,cfg.unitCap);
-  if(p==='/api/zh/me')return J({name:isGuest?'Guest':isPrev?'Preview':st.name,guest:isGuest,xp:st.xp,unit,consent:!isGuest&&!isPrev&&!!pf.consent,avatar:st.avatar||'',preview:isPrev,streak:await streakOf(D_,a.id,dayNo(Math.floor(Date.now()/1000))),cfg:{voice:cfg.voice,pinyin:cfg.pinyin,young:cfg.young}});
+  if(p==='/api/zh/me')return J({name:isGuest?'Guest':isPrev?'Preview':st.name,guest:isGuest,xp:st.xp,unit,consent:!isGuest&&!isPrev&&!!pf.consent,avatar:st.avatar||'',preview:isPrev,streak:await streakOf(D_,a.id,dayNo(Math.floor(Date.now()/1000))),cfg:{voice:cfg.voice,pinyin:cfg.pinyin,young:cfg.young,tier:cfg.tier}});
   // A guest becomes a full pupil: same row, new name and class, so XP and progress come with them. Uses the same class-code rules as joining.
   if(p==='/api/zh/upgrade'){if(!isGuest)return J({error:'You are already in a class.'},400);const code=parseCode(b.code),name=cleanName(b.name);if(!name)return J({error:'Type a name to use'},400);
    const j=await joinable(code);if(!j.ok)return J({error:j.err},j.s);
@@ -219,14 +224,18 @@ export default{async fetch(req,env){
    return J(await enter({id:st.id,name,xp:st.xp},code))}
   if(p==='/api/zh/consent'){if(isGuest)return J({error:'Join a class first.'},403);await D_.prepare('update zh_prof set consent=?,upd=? where student_id=?').bind(b.yes?1:0,Math.floor(Date.now()/1000),a.id).run();return J({consent:!!b.yes})}
   if(p==='/api/zh/session'){const now=Math.floor(Date.now()/1000),S=await states(D_,a.id),voice=cfg.voice&&!!pf.consent;
-   const young=b.young===1||b.young===true?true:b.young===0||b.young===false?false:cfg.young,r=E.compose({unit,states:S,day:dayNo(now),voice,young,seed:(Math.random()*1e9)|0});await D_.prepare('update zh_prof set sessions=sessions+1,upd=? where student_id=?').bind(now,a.id).run();return J({unit,steps:r.steps,secs:r.secs})}
+   // v0.8: a pupil may practise any unit they have reached ("focus"); progress and the saved unit do not change
+   const fu=Math.min(unit,Math.max(1,b.focus|0||unit)),young=b.young===1||b.young===true?true:b.young===0||b.young===false?false:cfg.young,
+    tier=['A','B','C'].includes(b.tier)?b.tier:cfg.tier,
+    r=tier==='A'?E.composeA({unit:fu,states:S,day:dayNo(now),seed:(Math.random()*1e9)|0}):E.compose({unit:fu,states:S,day:dayNo(now),voice,young,seed:(Math.random()*1e9)|0});
+   await D_.prepare('update zh_prof set sessions=sessions+1,upd=? where student_id=?').bind(now,a.id).run();return J({unit:fu,tier,steps:r.steps,secs:r.secs})}
   if(p==='/api/zh/result'){const kind=String(b.kind||''),key=String(b.key||''),act=String(b.act||'');
    if(!KINDS.has(kind)||!ACTS.has(act)||!E.offered(kind,key,unit))return J({error:'That item is not available yet.'},400);
    const now=Math.floor(Date.now()/1000),day=dayNo(now),ok=!!b.ok,S=await states(D_,a.id);
    const ms=b.ms|0,stmts=[D_.prepare('insert into zh_log(student_id,act,kind,key,ok,day) values(?,?,?,?,?,?)').bind(a.id,act,kind,key,ok?1:0,day),putState(D_,a.id,kind,key,E.update(S.get(kind+':'+key),ok,day),now)];
    if(!isPrev&&ms>0&&ms<300000)stmts.push(D_.prepare("insert into zh_event(student_id,ev,ref,ms,day) values(?,'item',?,?,?)").bind(a.id,act,ms,day));
    await D_.batch(stmts);
-   const adv=await maybeAdvance(D_,a.id,pf,cfg.unitCap);return J({unit:adv.unit,advanced:adv.moved})}
+   const adv=await (cfg.tier==='A'?maybeAdvanceA:maybeAdvance)(D_,a.id,pf,cfg.unitCap);return J({unit:adv.unit,advanced:adv.moved})}
   // v0.7: counts of meaning taps and finder opens (no content, no free text)
   if(p==='/api/zh/event'){const ev=String(b.ev||'');if(!EVENTS.has(ev))return J({error:'bad event'},400);if(isPrev)return J({ok:1});const day=dayNo(Math.floor(Date.now()/1000));
    const n=(await D_.prepare('select count(*) n from zh_event where student_id=? and day=?').bind(a.id,day).first()).n;if(n<500)await D_.prepare('insert into zh_event(student_id,ev,ref,day) values(?,?,?,?)').bind(a.id,ev,String(b.ref||'').slice(0,12),day).run();return J({ok:1})}
