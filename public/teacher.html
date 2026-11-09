@@ -1,28 +1,78 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teacher · Speak Mandarin 讲华语</title>
-<style>body{font:16px/1.4 "PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;max-width:900px;margin:0 auto;padding:16px;background:#fff6e0;color:#2b2140}h1{margin:.2em 0}section{background:#fff;border-radius:14px;padding:12px;margin:12px 0;box-shadow:0 1px 4px #0002}input,select,button{font:inherit;padding:8px 12px;margin:3px;border-radius:10px;border:1px solid #888}button{background:#2b2140;color:#fff;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #0002;text-align:left}.note{font-size:14px;color:#555}textarea{box-sizing:border-box;font:inherit;width:100%;min-height:110px;padding:8px;border-radius:10px;border:1px solid #888}details{margin:8px 0}summary{cursor:pointer;font-weight:700}.ok{color:#1b7a4b}.bad{color:#b3261e}</style></head>
-<body><h1>讲华语 Speak Mandarin: Teacher page</h1><div class="note"><a href="/">← Pupil app</a> · <a href="/admin.html">Admin</a></div><div id="o"></div><script type="module">import {UNITS} from '/zh-data.js';const UNIT_NUMS=Array.from({length:UNITS.length-1},(_,i)=>i+1);
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><!--stamp--><script type="importmap">{"imports":{"/app.js":"/app.js?v=0.7.0-6b0b86ff","/radicals.js":"/radicals.js?v=0.7.0-48bd80d1","/zh-data.js":"/zh-data.js?v=0.7.0-edc6fe21","/zh-engine.js":"/zh-engine.js?v=0.7.0-79d55fe7","/zh-gloss.js":"/zh-gloss.js?v=0.7.0-d0651891","/zh-meaning.js":"/zh-meaning.js?v=0.7.0-9b0ef531","/zh-pic.js":"/zh-pic.js?v=0.7.0-c35b3b65","/zh-speech.js":"/zh-speech.js?v=0.7.0-18643c3a","/zh-ui.js":"/zh-ui.js?v=0.7.0-2df8ffec"}}</script><!--/stamp--><title>Teacher · Speak Mandarin 讲华语</title>
+<style>:root{--ink:#2b2140;--mute:#574777;--paper:#fff6e0;--night:#1b1740;--lantern:#c7352f;--gold:#ffc857;--jade:#1d7a6f}
+*{box-sizing:border-box}body{font:16px/1.45 "PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;max-width:1000px;margin:0 auto;padding:16px;background:var(--paper);color:var(--ink)}
+h1{margin:.2em 0 .1em;font-size:26px}h2{margin:.1em 0 .4em;font-size:21px}h3{margin:.8em 0 .3em;font-size:17px}
+a{color:var(--lantern)}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+nav{display:flex;gap:8px 12px;flex-wrap:wrap;margin:6px 0 10px}nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:12px;background:var(--night);color:var(--paper);text-decoration:none;font-weight:600}nav a.hot{background:var(--lantern)}
+section{background:#fff;border-radius:16px;padding:14px;margin:14px 0;box-shadow:0 1px 4px #0002}
+input,select,button{font:inherit;padding:8px 12px;margin:3px;border-radius:10px;border:1px solid #6b5a8a;min-height:44px}
+button{background:var(--night);color:#fff;cursor:pointer;border-color:var(--night)}button.alt{background:#fff;color:var(--ink);border-color:#6b5a8a}button.hot{background:var(--lantern);border-color:var(--lantern)}button[disabled]{opacity:.5}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px}.row label{display:inline-flex;align-items:center;gap:6px;min-height:44px}.row input[type=checkbox]{width:22px;height:22px;margin:0}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px}td,th{padding:6px 8px;border-bottom:1px solid #0002;text-align:left;vertical-align:middle}th{font-size:14px;color:var(--mute);white-space:nowrap}
+.note{font-size:14px;color:var(--mute)}textarea{font:inherit;width:100%;min-height:110px;padding:8px;border-radius:10px;border:1px solid #6b5a8a}details{margin:8px 0}summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.ok{color:var(--jade);font-weight:600}.bad{color:#b3261e;font-weight:600}.pill{display:inline-block;background:#e9defa;border-radius:99px;padding:1px 10px;font-size:13px;margin:1px 2px}
+.def{font-size:18px}.py{font-size:14px;color:var(--mute)}.rep{border-top:1px solid #0002;padding:10px 0;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:start}.rep .w{font-size:26px;font-family:"Kaiti SC","STKaiti","KaiTi",serif}
+.tot{display:flex;gap:10px 22px;flex-wrap:wrap;margin:6px 0}.tot b{font-size:20px}</style></head>
+<body><h1>讲华语 Speak Mandarin: Teacher page</h1>
+<nav><a href="/">Pupil app</a><a class="hot" href="/radicals.html">Radical finder 部首</a><a href="/admin.html">Admin</a></nav><div id="o"></div>
+<script type="module">import {UNITS} from '/zh-data.js';import {checkVoice,speakParts} from '/zh-speech.js';import {AVATARS,PICS} from '/zh-pic.js';
+const UNIT_NUMS=Array.from({length:UNITS.length-1},(_,i)=>i+1);
 const o=document.getElementById('o');let tok=null;const flash={};
 const api=async(p,b)=>{const r=await fetch(p,{method:b?'POST':'GET',headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:b?JSON.stringify(b):undefined});return{s:r.status,j:await r.json().catch(()=>({}))}};
-const h=(t,a={},...k)=>{const e=document.createElement(t);for(const x in a){if(x.startsWith('on'))e.addEventListener(x.slice(2),a[x]);else if(x==='value')e.value=a[x];else if(x==='checked')e.checked=a[x];else e.setAttribute(x,a[x])}e.append(...k.flat().filter(c=>c!=null).map(c=>c.nodeType?c:document.createTextNode(c)));return e};
-function login(m){const u=h('input',{placeholder:'username'}),p=h('input',{type:'password',placeholder:'password'});o.replaceChildren(h('section',{},h('b',{},'Sign in'),h('br'),u,p,h('button',{onclick:async()=>{const r=await api('/api/teacher/login',{user:u.value,pass:p.value});if(r.s!==200)return login(r.j.error);tok=r.j.tok;main()}},'Sign in'),h('div',{},m||''),h('div',{class:'note'},'No account? Ask the person who runs the Admin page to make one for you.')))}
-async function main(){const cl=(await api('/api/teacher/classes')).j.classes||[],name=h('input',{placeholder:'New class name, e.g. 5A'});
- const secs=[h('section',{},name,h('button',{onclick:async()=>{await api('/api/teacher/class',{name:name.value});main()}},'Create class'))];
+const h=(t,a={},...k)=>{const e=document.createElement(t);for(const x in a){if(x.startsWith('on'))e.addEventListener(x.slice(2),a[x]);else if(x==='value')e.value=a[x];else if(x==='checked')e.checked=a[x];else e.setAttribute(x,a[x])}e.append(...k.flat().filter(c=>c!=null&&c!==false).map(c=>c.nodeType?c:document.createTextNode(c)));return e};
+function login(m){const u=h('input',{placeholder:'username','aria-label':'Username'}),p=h('input',{type:'password',placeholder:'password','aria-label':'Password'});o.replaceChildren(h('section',{},h('h2',{},'Sign in'),u,p,h('button',{onclick:async()=>{const r=await api('/api/teacher/login',{user:u.value,pass:p.value});if(r.s!==200)return login(r.j.error);tok=r.j.tok;main()}},'Sign in'),h('div',{class:'bad',role:'alert'},m||''),h('div',{class:'note'},'No account? Ask the person who runs the Admin page to make one for you.')))}
+
+// ---- this device's sound ----
+function soundSection(){const msg=h('div',{class:'note',role:'status'},'Not checked yet.');
+ return h('section',{},h('h2',{},'Check sound on this device'),h('div',{class:'note'},'Questions are read aloud with the browser voice. Open this page on a pupil device to check it can speak Chinese.'),
+  h('button',{onclick:async()=>{msg.textContent='Checking…';const v=await checkVoice();msg.className=v.found?'ok':'bad';msg.textContent=!v.supported?'This browser cannot speak. Use Chrome, Edge or Safari.':v.found?'Chinese voice found: '+v.name+'.':'No Chinese voice found. iPad: Settings > Accessibility > Spoken Content > Voices > Chinese. Windows or Chromebook: add a Chinese (Mandarin) language pack, then reload.'}},'Check'),
+  h('button',{class:'alt',onclick:()=>speakParts(['你好,欢迎来学华语。'])},'🔊 Test: 你好'),msg)}
+
+// ---- meaning reports (item: review flow) ----
+async function reportsSection(){const rs=(await api('/api/teacher/reports')).j.reports||[];let ZH={};try{ZH=(await import('/zh-gloss.js')).ZH}catch{}
+ const sec=h('section',{},h('h2',{},'Meaning reports'),h('div',{class:'note'},'Pupils and grown-ups can flag a Chinese meaning. Most reported first. To fix one, edit the word in gloss/defs*.txt, rebuild with build/make_gloss.py and redeploy: nothing here changes the shipped file. Read the pinyin line too, not only the characters.'));
+ if(!rs.length)sec.append(h('div',{class:'ok'},'No open reports.'));
+ const rn={meaning:'wrong meaning',pinyin:'wrong pinyin',hard:'too hard to read',other:'something else'};
+ for(const r of rs){const z=ZH[r.word];sec.append(h('div',{class:'rep'},h('div',{},h('span',{class:'w'},r.word),' ',h('b',{},r.n+' report'+(r.n===1?'':'s')+' from '+r.pupils+' pupil'+(r.pupils===1?'':'s')),' ',Object.entries(r.reasons).map(([k,n])=>h('span',{class:'pill'},(rn[k]||k)+' × '+n)),
+   z?h('div',{class:'def',lang:'zh'},z[0]):h('div',{class:'note'},'No definition found.'),z?h('div',{class:'py'},z[1]):null),
+  h('button',{class:'alt',onclick:async()=>{await api('/api/teacher/report-done',{word:r.word});main()}},'Mark done')))}
+ return sec}
+
+// ---- printable picture cards ----
+async function printCards(c){const r=(await api('/api/teacher/pics?code='+c.code)).j;const w=window.open('','_blank');if(!w){alert('Allow pop-ups to print the cards.');return}
+ const d=w.document;d.title='Picture cards '+c.name;const st=d.createElement('style');st.textContent='body{font:16px system-ui,sans-serif;margin:12px}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.c{border:2px dashed #888;border-radius:14px;padding:10px;text-align:center;break-inside:avoid}.a{font-size:54px}.n{font-weight:700;font-size:20px}.p{font-size:44px;letter-spacing:8px}.t{font-size:13px;color:#555}@media print{.no{display:none}}';d.head.append(st);
+ const top=d.createElement('div');top.className='no';top.innerHTML='<p>Class code: <b></b>. Cut out the cards and give each pupil their own. <button onclick="print()">Print</button></p>';top.querySelector('b').textContent=c.code;d.body.append(top);
+ const g=d.createElement('div');g.className='g';for(const p of r.pupils){const k=d.createElement('div');k.className='c';k.innerHTML='<div class="a"></div><div class="n"></div><div class="p"></div><div class="t"></div>';k.querySelector('.a').textContent=p.avatar||'';k.querySelector('.n').textContent=p.name;k.querySelector('.p').textContent=p.pic.map(i=>PICS[i]).join(' ');k.querySelector('.t').textContent='Class '+c.code;g.append(k)}d.body.append(g)}
+
+async function main(){const cl=(await api('/api/teacher/classes')).j.classes||[],name=h('input',{placeholder:'New class name, e.g. 5A','aria-label':'New class name'});
+ const secs=[await reportsSection(),h('section',{},h('h2',{},'New class'),name,h('button',{onclick:async()=>{await api('/api/teacher/class',{name:name.value});main()}},'Create class'))];
  for(const c of cl){const sec=h('section',{},h('h2',{},c.name+'  ·  code '+c.code));
-  const chk=(label,key,val)=>h('label',{},h('input',{type:'checkbox',checked:val,onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{[key]:e.target.checked}})}}),' '+label+'  ');
-  const pin=h('select',{onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{pinyin:e.target.value}})}},[['tap','Tap to show pinyin'],['on','Always show pinyin'],['off','Never show pinyin']].map(([v,t])=>{const op=h('option',{value:v},t);if(c.cfg.pinyin===v)op.selected=true;return op}));
-  const cap=h('select',{onchange:async e=>{await api('/api/teacher/settings',{code:c.code,zh:{unitCap:+e.target.value}})}},UNIT_NUMS.map(n=>{const op=h('option',{value:n},'Up to unit '+n);if(c.cfg.unitCap===n)op.selected=true;return op}));
-  const enrol=h('label',{},h('input',{type:'checkbox',checked:c.enrol!=='closed',onchange:async e=>{await api('/api/teacher/settings',{code:c.code,enrol:e.target.checked?'open':'closed'})}}),' Pupils can make their own account with the class code  ');
-  sec.append(chk('Chinese room on','on',c.cfg.on),chk('Voice practice on (default off)','voice',c.cfg.voice),pin,cap,h('br'),enrol,h('div',{class:'note'},'Sign-up on: a pupil enters the class code and picks a name. Sign-up off: only pupils you add below can sign in. Voice also needs a parent or guardian to tick yes inside the app. Use first names or nicknames only.'));
-  const ta=h('textarea',{placeholder:'One first name or nickname per line\nAli\nBea\nCy',maxlength:'12000'}),cnt=h('span',{class:'note'},''),res=h('div',{class:'ok'},flash[c.code]?.text||'');
+  const set=(zh,extra)=>api('/api/teacher/settings',{code:c.code,zh,...(extra||{})});
+  const chk=(label,key,val)=>h('label',{},h('input',{type:'checkbox',checked:val,onchange:async e=>{await set({[key]:e.target.checked})}}),label);
+  const sel=(opts,cur,fn,label)=>h('select',{'aria-label':label,onchange:e=>fn(e.target.value)},opts.map(([v,t])=>{const op=h('option',{value:v},t);if(String(cur)===String(v))op.selected=true;return op}));
+  const pin=sel([['tap','Tap to show pinyin'],['on','Always show pinyin'],['off','Never show pinyin']],c.cfg.pinyin,v=>set({pinyin:v}),'Pinyin');
+  const cap=sel(UNIT_NUMS.map(n=>[n,'Up to unit '+n]),c.cfg.unitCap,v=>set({unitCap:+v}),'Highest unit');
+  const lg=sel([['name','Sign in: name'],['picture','Sign in: pictures (ages 6 to 7)']],c.cfg.login,async v=>{await set({login:v});main()},'Sign-in style');
+  const enrol=h('label',{},h('input',{type:'checkbox',checked:c.enrol!=='closed',onchange:async e=>{await api('/api/teacher/settings',{code:c.code,enrol:e.target.checked?'open':'closed'})}}),'Pupils can make their own account with the class code');
+  sec.append(h('div',{class:'row'},chk(' Chinese room on','on',c.cfg.on),chk(' Voice practice on (default off)','voice',c.cfg.voice),chk(' Younger learners, ages 6 to 9 (shorter sessions, simpler activities, bigger buttons)','young',c.cfg.young)),h('div',{class:'row'},pin,cap,lg),h('div',{class:'row'},enrol),
+   h('div',{class:'note'},'Sign-up on: a pupil enters the class code and picks a name. Sign-up off: only pupils you add below can sign in. Picture sign-in: pupils tap their own picture, then three pictures; print the cards below. Voice also needs a parent or guardian to tick yes inside the app. Use first names or nicknames only.'));
+  // preview as a pupil
+  const pu=sel(UNIT_NUMS.map(n=>[n,'Unit '+n]),1,()=>{},'Preview unit');
+  sec.append(h('div',{class:'row'},h('b',{},'Preview as a pupil:'),pu,h('button',{class:'hot',onclick:async()=>{const r=await api('/api/teacher/preview',{code:c.code,unit:+pu.value});if(r.s!==200)return alert(r.j.error||'Could not open the preview');const w=window.open('/#preview='+r.j.tok,'_blank');if(!w)alert('Allow pop-ups to open the preview.')}},'Open preview'),h('span',{class:'note'},'Uses this class\'s settings. Nothing is saved and it is not counted.')));
+  if(c.cfg.login==='picture')sec.append(h('div',{class:'row'},h('button',{onclick:()=>printCards(c)},'Print picture cards')));
+  const ta=h('textarea',{placeholder:'One first name or nickname per line\nAli\nBea\nCy',maxlength:'12000','aria-label':'Pupil names'}),cnt=h('span',{class:'note'},''),res=h('div',{class:'ok'},flash[c.code]?.text||'');
   const names=()=>{const seen=new Set();return ta.value.split(/[\r\n,;\t]+/).map(x=>x.replace(/\s+/g,' ').trim().slice(0,30)).filter(x=>x&&!seen.has(x.toLowerCase())&&seen.add(x.toLowerCase()))};
   ta.addEventListener('input',()=>{cnt.textContent=names().length?names().length+' names':''});
   const bulk=h('details',{},h('summary',{},'Add pupils in bulk'),h('div',{class:'note'},'Paste a list from your class register. First names or nicknames only. Names already in the class are skipped.'),ta,h('div',{},h('button',{onclick:async e=>{e.target.disabled=true;const r=await api('/api/teacher/bulk',{code:c.code,names:ta.value});
    if(r.s!==200){e.target.disabled=false;res.className='bad';res.textContent=r.j.error||'Could not add';return}
    flash[c.code]={text:'Added '+r.j.added+(r.j.skipped.length?'. Already in the class, skipped: '+r.j.skipped.join(', '):'')+'.'};main()}},'Add pupils'),cnt),res);
   if(flash[c.code])bulk.open=true;sec.append(bulk);delete flash[c.code];
-  const t=h('table',{},h('tr',{},h('th',{},'Pupil'),h('th',{},'Unit'),h('th',{},'Mastered'),h('th',{},'⭐'),h('th',{},'Voice yes'),h('th',{},'')));
   const ps=(await api('/api/teacher/students?code='+c.code)).j.students||[];
-  for(const s of ps)t.append(h('tr',{},h('td',{},s.name),h('td',{},h('select',{onchange:async e=>{await api('/api/teacher/unit',{id:s.id,unit:+e.target.value})}},UNIT_NUMS.map(n=>{const op=h('option',{value:n},n);if(s.unit===n)op.selected=true;return op}))),h('td',{},s.mastered),h('td',{},s.xp),h('td',{},s.consent?'yes':'no'),h('td',{},h('button',{onclick:async()=>{if(confirm('Remove '+s.name+' and ALL their data? This cannot be undone.')){await api('/api/teacher/remove',{id:s.id});main()}}},'Remove'))));
-  sec.append(t);secs.push(sec)}
- o.replaceChildren(...secs)}
+  const sum=k=>ps.reduce((n,s)=>n+(s[k]||0),0);
+  if(ps.length)sec.append(h('div',{class:'tot'},h('span',{},h('b',{},ps.length),' pupils'),h('span',{},h('b',{},sum('mean')),' meaning taps (30 days)'),h('span',{},h('b',{},sum('finder')),' finder opens (30 days)')));
+  const t=h('table',{},h('tr',{},...['Pupil','Unit','Words met','Mastered','⭐','Meaning taps','Finder opens','Sec per item','Voice yes',''].map(x=>h('th',{},x))));
+  for(const s of ps)t.append(h('tr',{},h('td',{},s.name),h('td',{},sel(UNIT_NUMS.map(n=>[n,n]),s.unit,async v=>{await api('/api/teacher/unit',{id:s.id,unit:+v})},'Unit for '+s.name)),h('td',{},s.met),h('td',{},s.mastered),h('td',{},s.xp),h('td',{},s.mean),h('td',{},s.finder),h('td',{},s.secs||'–'),h('td',{},s.consent?'yes':'no'),
+   h('td',{},c.cfg.login==='picture'?h('button',{class:'alt',onclick:async()=>{if(confirm('Give '+s.name+' new pictures? Print a new card for them.')){await api('/api/teacher/picreset',{id:s.id});flash[c.code]={text:'New pictures for '+s.name+'. Print the cards again.'};main()}}},'New pictures'):null,h('button',{class:'alt',onclick:async()=>{if(confirm('Remove '+s.name+' and ALL their data? This cannot be undone.')){await api('/api/teacher/remove',{id:s.id});main()}}},'Remove'))));
+  sec.append(h('div',{class:'scroll'},t),h('div',{class:'note'},'Words met: words the pupil has been asked about. Meaning taps and finder opens show whether those tools are used. Sec per item: average time on a question.'));secs.push(sec)}
+ secs.push(soundSection());o.replaceChildren(...secs)}
 login();</script></body></html>

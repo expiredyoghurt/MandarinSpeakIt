@@ -1,6 +1,7 @@
-// Mandarin Say It! Worker (v0.4). Cloudflare Worker + D1. No Durable Objects yet (no multiplayer in this version).
+// Mandarin Say It! Worker (v0.7). Cloudflare Worker + D1. No Durable Objects yet (no multiplayer in this version).
 import E from '../public/zh-engine.js';
 import D from '../public/zh-data.js';
+import {AVATARS,PICS,picValid,picKey,randomPic} from '../public/zh-pic.js';
 import {MAXU,zhCfg,engines,runEngine,score,scoreHeard,sayTier,SAY_CAP,SAY_DAILY,SAY_GAP,SAY_MAXBYTES} from './speech.js';
 
 const J=(o,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{'content-type':'application/json','cache-control':'no-store'}});
@@ -63,7 +64,21 @@ async function listen(env,a,tag,get){
  const tot=await DB.prepare('select xp from speech_best where student_id=? and word=?').bind(a.id,tag).first();
  return J({result:out.result,acc:out.acc,xp:gain,total:tot.xp,hint:out.hint,per:out.per,heard:String(out.heard||'').slice(0,40)})}
 
-async function wipe(DB,id){await DB.batch(['zh_prof','zh_state','zh_log','speech_best','speech_attempts'].map(t=>DB.prepare(`delete from ${t} where student_id=?`).bind(id)).concat([DB.prepare('delete from students where id=?').bind(id)]))}
+// ---- v0.7 helpers ----
+const PREVIEW='_PREVIEW_',baseCode=c=>String(c||'').startsWith(PREVIEW)?String(c).slice(PREVIEW.length):c;
+const rnd=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
+// Give every pupil in a picture-login class an avatar and a three-picture code (existing ones are kept).
+async function fillPics(DB,code){const rows=(await DB.prepare('select id from students where code=? and (avatar is null or pic is null)').bind(code).all()).results;if(!rows.length)return;
+ const used=new Set((await DB.prepare('select avatar from students where code=? and avatar is not null').bind(code).all()).results.map(r=>r.avatar));
+ for(const r of rows){const free=AVATARS.filter(a=>!used.has(a)),pool=free.length?free:AVATARS,av=pool[Math.floor(rnd()*pool.length)];used.add(av);
+  await DB.prepare('update students set avatar=coalesce(avatar,?),pic=coalesce(pic,?) where id=?').bind(av,picKey(randomPic(rnd)),r.id).run()}}
+const FAIL_MAX=5,FAIL_WINDOW=600;
+// Days played in the last week (oldest first) and the run of days in a row ending today (or yesterday, so the streak is not lost before today's session).
+async function streakOf(DB,id,today){const rows=(await DB.prepare('select distinct day from zh_log where student_id=? and day>=?').bind(id,today-59).all()).results,have=new Set(rows.map(r=>r.day));
+ const days=Array.from({length:7},(_,i)=>have.has(today-6+i));let run=0,d=have.has(today)?today:today-1;while(have.has(d)){run++;d--}return{days,run}}
+const EVENTS=new Set(['mean','finder']),REASONS=new Set(['meaning','pinyin','hard','other']);
+
+async function wipe(DB,id){await DB.batch(['zh_prof','zh_state','zh_log','speech_best','speech_attempts','zh_event','zh_fail','zh_report'].map(t=>DB.prepare(`delete from ${t} where student_id=?`).bind(id)).concat([DB.prepare('delete from students where id=?').bind(id)]))}
 
 export default{async fetch(req,env){
  const u=new URL(req.url),p=u.pathname,D_=env.DB;
@@ -95,8 +110,8 @@ export default{async fetch(req,env){
 
  // ---- Login, join, guest ----
  // What every sign-in returns. Guests get the default room with voice off (voice needs a class and a grown-up's yes).
- const enter=async(s,code)=>{const set=await classSettings(D_,code),cfg=zhCfg(set),pf=await prof(D_,s.id),g=code===GUEST;
-  return{tok:await sign(env,{r:'s',id:s.id,code}),name:g?'Guest':s.name,guest:g,code:g?'':code,xp:s.xp|0,unit:Math.min(pf.unit,cfg.unitCap),cfg:{voice:g?false:cfg.voice,pinyin:cfg.pinyin},consent:g?false:!!pf.consent}};
+ const enter=async(s,code,extra={})=>{const set=await classSettings(D_,baseCode(code)),cfg=zhCfg(set),pf=await prof(D_,s.id),g=code===GUEST;
+  return{tok:await sign(env,{r:'s',id:s.id,code}),name:g?'Guest':s.name,guest:g,code:g?'':code,xp:s.xp|0,unit:Math.min(pf.unit,cfg.unitCap),cfg:{voice:g?false:cfg.voice,pinyin:cfg.pinyin,young:cfg.young},consent:g?false:!!pf.consent,avatar:s.avatar||'',preview:String(code).startsWith(PREVIEW),streak:await streakOf(D_,s.id,dayNo(Math.floor(Date.now()/1000))),...extra}};
  // A class that a pupil may join by themselves: it exists, the Chinese room is on, and the teacher has the sign-up switch on.
  const joinable=async code=>{if(!code||code===GUEST)return{err:'Unknown class code',s:404};if(!await D_.prepare('select 1 from classes where code=?').bind(code).first())return{err:'Unknown class code',s:404};
   const set=await classSettings(D_,code);if(!zhCfg(set).on)return{err:'This class is not using the Chinese room.',s:403};
@@ -107,12 +122,25 @@ export default{async fetch(req,env){
   const s=await D_.prepare('select * from students where (name=? or name=?) and code=?').bind(name,raw,code).first();
   if(!s)return J({error:set.enrol==='closed'?'No account with that name. Check the spelling, or ask your teacher.':'No account with that name yet. Check the spelling, or tap "New here?" to make one.',canJoin:set.enrol!=='closed'},404);
   return J(await enter(s,code))}
+ // Picture login. The roster shows first names and avatars only, and only for a class set to picture login. The three-picture code is never sent.
+ if(p==='/api/class-roster'){const code=parseCode(b.code);if(!code||code===GUEST||String(code).startsWith(PREVIEW))return J({error:'Unknown class code'},404);
+  const c=await D_.prepare('select code,name from classes where code=?').bind(code).first();if(!c)return J({error:'Unknown class code'},404);const cfg=zhCfg(await classSettings(D_,code));
+  if(!cfg.on)return J({error:'This class is not using the Chinese room.'},403);if(cfg.login!=='picture')return J({error:'This class signs in with a name.',name:1},400);
+  await fillPics(D_,code);return J({code,pupils:(await D_.prepare('select id,name,avatar from students where code=? order by name').bind(code).all()).results})}
+ if(p==='/api/login-pic'){const code=parseCode(b.code),id=b.id|0,pic=b.pic;
+  const s=await D_.prepare('select * from students where id=? and code=?').bind(id,code).first();if(!s||!picValid(pic))return J({error:'Try again'},400);
+  const cfg=zhCfg(await classSettings(D_,code));if(!cfg.on||cfg.login!=='picture')return J({error:'This class signs in with a name.'},403);
+  const now=Math.floor(Date.now()/1000),f=await D_.prepare('select n,ts from zh_fail where student_id=?').bind(s.id).first();
+  if(f&&f.n>=FAIL_MAX&&now-f.ts<FAIL_WINDOW)return J({error:'Too many tries. Wait a minute, then try again.',wait:1},429);
+  if(picKey(pic)!==s.pic){const n=f&&now-f.ts<FAIL_WINDOW?f.n+1:1;await D_.prepare('insert into zh_fail(student_id,n,ts) values(?,?,?) on conflict(student_id) do update set n=excluded.n,ts=excluded.ts').bind(s.id,n,now).run();return J({error:'Not those pictures. Try again.',bad:1},401)}
+  await D_.prepare('delete from zh_fail where student_id=?').bind(s.id).run();return J(await enter(s,code))}
  // Step 1 of joining: is this class code one I can join? (Lets the app say so before asking for a username.)
  if(p==='/api/class-check'){const code=parseCode(b.code),j=await joinable(code);return j.ok?J({ok:1,code}):J({error:j.err},j.s)}
  // Pupil makes their own account with only the class code and a username.
  if(p==='/api/join'){const code=parseCode(b.code),name=cleanName(b.name);if(!name)return J({error:'Type a name to use'},400);
   const j=await joinable(code);if(!j.ok)return J({error:j.err},j.s);
   let r;try{r=await D_.prepare('insert into students(name,code) values(?,?)').bind(name,code).run()}catch{return J({error:'That name is already used in this class. Pick another name, or sign in if it is you.',taken:1},409)}
+  if(zhCfg(await classSettings(D_,code)).login==='picture'){await fillPics(D_,code);const s=await D_.prepare('select * from students where id=?').bind(r.meta.last_row_id).first();return J(await enter(s,code,{pic:s.pic.split(',').map(Number)}))}
   return J(await enter({id:r.meta.last_row_id,name,xp:0},code))}
  // Guest: no class, no name. Untouched guest rows are swept after GUEST_KEEP_DAYS.
  if(p==='/api/guest'){const cut=Math.floor(Date.now()/1000)-GUEST_KEEP_DAYS*86400;
@@ -134,13 +162,35 @@ export default{async fetch(req,env){
    for(let i=0;i<6;i++){const code=Array.from(crypto.getRandomValues(new Uint8Array(5)),x=>CODE_ALPHA[x%CODE_ALPHA.length]).join('');
     try{await D_.prepare('insert into classes(code,name,teacher_id,settings) values(?,?,?,?)').bind(code,name,a.id,JSON.stringify({enrol:'closed',zh:{unitCap:MAXU}})).run();return J({code})}catch{}}return J({error:'Try again'},500)}
   if(p==='/api/teacher/settings'){const c=await own(b.code);if(!c)return J({error:'Not your class'},403);const s=JSON.parse(c.settings||'{}'),z=b.zh||{};
-   s.zh={...(s.zh||{}),...(z.on!==undefined?{on:!!z.on}:{}),...(z.voice!==undefined?{voice:!!z.voice}:{}),...(z.pinyin?{pinyin:z.pinyin}:{}),...(z.unitCap?{unitCap:z.unitCap|0}:{})};if(b.enrol)s.enrol=b.enrol==='closed'?'closed':'open';
-   await D_.prepare('update classes set settings=? where code=?').bind(JSON.stringify(s),c.code).run();return J({cfg:zhCfg(s)})}
+   s.zh={...(s.zh||{}),...(z.on!==undefined?{on:!!z.on}:{}),...(z.voice!==undefined?{voice:!!z.voice}:{}),...(z.young!==undefined?{young:!!z.young}:{}),...(z.login?{login:z.login==='picture'?'picture':'name'}:{}),...(z.pinyin?{pinyin:z.pinyin}:{}),...(z.unitCap?{unitCap:z.unitCap|0}:{})};if(b.enrol)s.enrol=b.enrol==='closed'?'closed':'open';
+   await D_.prepare('update classes set settings=? where code=?').bind(JSON.stringify(s),c.code).run();if(zhCfg(s).login==='picture')await fillPics(D_,c.code);return J({cfg:zhCfg(s)})}
   if(p==='/api/teacher/students'){const c=await own(u.searchParams.get('code'));if(!c)return J({error:'Not your class'},403);
    const ss=(await D_.prepare('select s.id,s.name,s.xp,coalesce(z.unit,1) unit,coalesce(z.consent,0) consent from students s left join zh_prof z on z.student_id=s.id where s.code=? order by s.name').bind(c.code).all()).results;
    const rows=(await D_.prepare("select student_id,kind,h,d from zh_state where kind in ('c','w') and student_id in (select id from students where code=?)").bind(c.code).all()).results,m={};
    for(const r of rows){if(E.mastered({h:JSON.parse(r.h),d:JSON.parse(r.d)}))m[r.student_id]=(m[r.student_id]||0)+1}
-   return J({students:ss.map(s=>({...s,mastered:m[s.id]||0}))})}
+   // v0.7 usage: words met, meaning taps, finder opens and average seconds per item (last 30 days)
+   const day=dayNo(Math.floor(Date.now()/1000)),use={},met={};
+   for(const r of (await D_.prepare("select student_id,sum(ev='mean') mean,sum(ev='finder') finder,avg(case when ev='item' then ms end) ms from zh_event where day>=? and student_id in (select id from students where code=?) group by student_id").bind(day-29,c.code).all()).results)use[r.student_id]=r;
+   for(const r of (await D_.prepare("select student_id,count(*) n from zh_state where kind='w' and h!='[]' and student_id in (select id from students where code=?) group by student_id").bind(c.code).all()).results)met[r.student_id]=r.n;
+   return J({students:ss.map(s=>({...s,mastered:m[s.id]||0,met:met[s.id]||0,mean:use[s.id]?.mean|0,finder:use[s.id]?.finder|0,secs:use[s.id]&&use[s.id].ms?Math.round(use[s.id].ms/1000):0}))})}
+  // v0.7 picture login cards: the teacher can see (and print) each pupil's picture code. Reset gives a new one.
+  if(p==='/api/teacher/pics'){const c=await own(u.searchParams.get('code'));if(!c)return J({error:'Not your class'},403);await fillPics(D_,c.code);
+   return J({pupils:(await D_.prepare('select id,name,avatar,pic from students where code=? order by name').bind(c.code).all()).results.map(r=>({id:r.id,name:r.name,avatar:r.avatar,pic:String(r.pic||'').split(',').map(Number)})),avatars:AVATARS,pics:PICS})}
+  if(p==='/api/teacher/picreset'){const s=await D_.prepare('select s.id from students s join classes c on c.code=s.code where s.id=? and c.teacher_id=?').bind(b.id|0,a.id).first();if(!s)return J({error:'Not your pupil'},403);
+   await D_.batch([D_.prepare('update students set pic=? where id=?').bind(picKey(randomPic(rnd)),s.id),D_.prepare('delete from zh_fail where student_id=?').bind(s.id)]);return J({ok:1})}
+  // v0.7 meaning reports, most reported first. Corrections go into gloss/defs*.txt and the file is rebuilt; nothing here edits the shipped file.
+  if(p==='/api/teacher/reports'){const rows=(await D_.prepare('select word,count(*) n,count(distinct student_id) pupils,group_concat(reason) reasons,max(ts) last from zh_report where done=0 and code in (select code from classes where teacher_id=?) group by word order by n desc,last desc limit 200').bind(a.id).all()).results;
+   return J({reports:rows.map(r=>{const rs={};for(const x of String(r.reasons||'').split(','))if(x)rs[x]=(rs[x]||0)+1;return{word:r.word,n:r.n,pupils:r.pupils,reasons:rs,last:r.last}})})}
+  if(p==='/api/teacher/report-done'){await D_.prepare('update zh_report set done=1 where word=? and code in (select code from classes where teacher_id=?)').bind(String(b.word||''),a.id).run();return J({ok:1})}
+  // v0.7 preview as a pupil: a throwaway pupil under a reserved code that reads this class's settings. Reset every time, so no progress is kept.
+  if(p==='/api/teacher/preview'){const c=await own(b.code);if(!c)return J({error:'Not your class'},403);
+   const pcode=PREVIEW+c.code,name='preview-'+a.id,cut=Math.floor(Date.now()/1000)-86400;
+   for(const o of (await D_.prepare("select s.id from students s left join zh_prof z on z.student_id=s.id where s.code like '_PREVIEW\\_%' escape '\\' and coalesce(z.upd,0)<? and s.name!=? limit 20").bind(cut,name).all()).results)await wipe(D_,o.id);
+   let s=await D_.prepare('select * from students where name=? and code=?').bind(name,pcode).first();
+   if(!s){const r=await D_.prepare('insert into students(name,code) values(?,?)').bind(name,pcode).run();s={id:r.meta.last_row_id,name,xp:0}}
+   for(const t of ['zh_prof','zh_state','zh_log','zh_event','zh_fail'])await D_.prepare(`delete from ${t} where student_id=?`).bind(s.id).run();await D_.prepare('update students set xp=0 where id=?').bind(s.id).run();
+   const cfg=zhCfg(await classSettings(D_,c.code)),unit=Math.min(cfg.unitCap,Math.max(1,b.unit|0||1));await D_.prepare('insert into zh_prof(student_id,unit,upd) values(?,?,?)').bind(s.id,unit,Math.floor(Date.now()/1000)).run();
+   return J({tok:await sign(env,{r:'s',id:s.id,code:pcode})})}
   // Add many pupils at once: a pasted list of first names or nicknames (one per line; commas, semicolons and tabs also split).
   if(p==='/api/teacher/bulk'){const c=await own(b.code);if(!c)return J({error:'Not your class'},403);
    const raw=Array.isArray(b.names)?b.names:String(b.names||'').split(/[\r\n,;\t]+/),seen=new Set(),names=[];
@@ -148,6 +198,7 @@ export default{async fetch(req,env){
    if(!names.length)return J({error:'No names found. Type or paste one name per line.'},400);if(names.length>300)return J({error:'That is '+names.length+' names. Add up to 300 at a time.'},400);
    const have=new Set((await D_.prepare('select name from students where code=?').bind(c.code).all()).results.map(r=>String(r.name).toLowerCase())),fresh=names.filter(n=>!have.has(n.toLowerCase())),skipped=names.filter(n=>have.has(n.toLowerCase()));
    if(fresh.length)await D_.prepare('insert or ignore into students(name,code) select value,? from json_each(?)').bind(c.code,JSON.stringify(fresh)).run();
+   if(zhCfg(await classSettings(D_,c.code)).login==='picture')await fillPics(D_,c.code);
    return J({added:fresh.length,skipped})}
   if(p==='/api/teacher/unit'){const s=await D_.prepare('select s.id from students s join classes c on c.code=s.code where s.id=? and c.teacher_id=?').bind(b.id|0,a.id).first();if(!s)return J({error:'Not your pupil'},403);
    await prof(D_,s.id);await D_.prepare('update zh_prof set unit=? where student_id=?').bind(Math.min(MAXU,Math.max(1,b.unit|0)),s.id).run();return J({ok:1})}
@@ -156,11 +207,11 @@ export default{async fetch(req,env){
 
  // ---- Pupil ----
  if(p.startsWith('/api/zh/')){if(!a||a.r!=='s')return J({error:'Not signed in'},401);
-  const st=await D_.prepare('select id,name,xp,code from students where id=?').bind(a.id).first();if(!st)return J({error:'Not signed in'},401);
-  const isGuest=st.code===GUEST,set=await classSettings(D_,st.code),cfg=zhCfg(set);if(!cfg.on)return J({error:'off',off:1},403);a={...a,code:st.code}; // the stored class decides, never the token's
-  if(isGuest)cfg.voice=false;
+  const st=await D_.prepare('select id,name,xp,code,avatar from students where id=?').bind(a.id).first();if(!st)return J({error:'Not signed in'},401);
+  const isGuest=st.code===GUEST,isPrev=st.code.startsWith(PREVIEW),set=await classSettings(D_,baseCode(st.code)),cfg=zhCfg(set);if(!cfg.on)return J({error:'off',off:1},403);a={...a,code:st.code}; // the stored class decides, never the token's
+  if(isGuest||isPrev)cfg.voice=false;
   const pf=await prof(D_,a.id),unit=Math.min(pf.unit,cfg.unitCap);
-  if(p==='/api/zh/me')return J({name:isGuest?'Guest':st.name,guest:isGuest,xp:st.xp,unit,consent:!isGuest&&!!pf.consent,cfg:{voice:cfg.voice,pinyin:cfg.pinyin}});
+  if(p==='/api/zh/me')return J({name:isGuest?'Guest':isPrev?'Preview':st.name,guest:isGuest,xp:st.xp,unit,consent:!isGuest&&!isPrev&&!!pf.consent,avatar:st.avatar||'',preview:isPrev,streak:await streakOf(D_,a.id,dayNo(Math.floor(Date.now()/1000))),cfg:{voice:cfg.voice,pinyin:cfg.pinyin,young:cfg.young}});
   // A guest becomes a full pupil: same row, new name and class, so XP and progress come with them. Uses the same class-code rules as joining.
   if(p==='/api/zh/upgrade'){if(!isGuest)return J({error:'You are already in a class.'},400);const code=parseCode(b.code),name=cleanName(b.name);if(!name)return J({error:'Type a name to use'},400);
    const j=await joinable(code);if(!j.ok)return J({error:j.err},j.s);
@@ -168,12 +219,24 @@ export default{async fetch(req,env){
    return J(await enter({id:st.id,name,xp:st.xp},code))}
   if(p==='/api/zh/consent'){if(isGuest)return J({error:'Join a class first.'},403);await D_.prepare('update zh_prof set consent=?,upd=? where student_id=?').bind(b.yes?1:0,Math.floor(Date.now()/1000),a.id).run();return J({consent:!!b.yes})}
   if(p==='/api/zh/session'){const now=Math.floor(Date.now()/1000),S=await states(D_,a.id),voice=cfg.voice&&!!pf.consent;
-   const r=E.compose({unit,states:S,day:dayNo(now),voice,seed:(Math.random()*1e9)|0});await D_.prepare('update zh_prof set sessions=sessions+1,upd=? where student_id=?').bind(now,a.id).run();return J({unit,steps:r.steps,secs:r.secs})}
+   const young=b.young===1||b.young===true?true:b.young===0||b.young===false?false:cfg.young,r=E.compose({unit,states:S,day:dayNo(now),voice,young,seed:(Math.random()*1e9)|0});await D_.prepare('update zh_prof set sessions=sessions+1,upd=? where student_id=?').bind(now,a.id).run();return J({unit,steps:r.steps,secs:r.secs})}
   if(p==='/api/zh/result'){const kind=String(b.kind||''),key=String(b.key||''),act=String(b.act||'');
    if(!KINDS.has(kind)||!ACTS.has(act)||!E.offered(kind,key,unit))return J({error:'That item is not available yet.'},400);
    const now=Math.floor(Date.now()/1000),day=dayNo(now),ok=!!b.ok,S=await states(D_,a.id);
-   await D_.batch([D_.prepare('insert into zh_log(student_id,act,kind,key,ok,day) values(?,?,?,?,?,?)').bind(a.id,act,kind,key,ok?1:0,day),putState(D_,a.id,kind,key,E.update(S.get(kind+':'+key),ok,day),now)]);
+   const ms=b.ms|0,stmts=[D_.prepare('insert into zh_log(student_id,act,kind,key,ok,day) values(?,?,?,?,?,?)').bind(a.id,act,kind,key,ok?1:0,day),putState(D_,a.id,kind,key,E.update(S.get(kind+':'+key),ok,day),now)];
+   if(!isPrev&&ms>0&&ms<300000)stmts.push(D_.prepare("insert into zh_event(student_id,ev,ref,ms,day) values(?,'item',?,?,?)").bind(a.id,act,ms,day));
+   await D_.batch(stmts);
    const adv=await maybeAdvance(D_,a.id,pf,cfg.unitCap);return J({unit:adv.unit,advanced:adv.moved})}
+  // v0.7: counts of meaning taps and finder opens (no content, no free text)
+  if(p==='/api/zh/event'){const ev=String(b.ev||'');if(!EVENTS.has(ev))return J({error:'bad event'},400);if(isPrev)return J({ok:1});const day=dayNo(Math.floor(Date.now()/1000));
+   const n=(await D_.prepare('select count(*) n from zh_event where student_id=? and day=?').bind(a.id,day).first()).n;if(n<500)await D_.prepare('insert into zh_event(student_id,ev,ref,day) values(?,?,?,?)').bind(a.id,ev,String(b.ref||'').slice(0,12),day).run();return J({ok:1})}
+  // v0.7: "Report this meaning". Fixed reasons only, one open report per pupil per word, 20 a day.
+  if(p==='/api/zh/report'){const word=String(b.word||''),reason=String(b.reason||'');if(!D.BYW[word]||!REASONS.has(reason))return J({error:'bad report'},400);if(isPrev)return J({ok:1});
+   const now=Math.floor(Date.now()/1000);if((await D_.prepare('select 1 from zh_report where student_id=? and word=? and done=0').bind(a.id,word).first()))return J({ok:1,again:1});
+   if((await D_.prepare('select count(*) n from zh_report where student_id=? and ts>?').bind(a.id,now-86400).first()).n>=20)return J({error:'That is enough reports for today. Thank you!'},429);
+   await D_.prepare('insert into zh_report(word,reason,code,student_id,ts) values(?,?,?,?,?)').bind(word,reason,st.code,a.id,now).run();return J({ok:1})}
+  // v0.7: what the pupil has mastered (characters) and met (words), for finder stickers and the home screen
+  if(p==='/api/zh/progress'){const S=await states(D_,a.id),mc=[],mw=[];for(const [k,v] of S){if(k[0]==='c'&&E.mastered(v))mc.push(k.slice(2));if(k[0]==='w'&&v.h.length)mw.push(k.slice(2))}return J({mastered:mc,met:mw})}
   if(p==='/api/zh/heard'){const tag=(String(b.k||'')+':'+String(b.key||''));if(!/^[ws]:/.test(tag))return J({error:'bad item'},400);return listen(env,a,tag,async it=>({...scoreHeard(it.text,b.alts),engine:'browser'}))}
   return J({error:'Not found'},404)}
  return J({error:'Not found'},404)}}

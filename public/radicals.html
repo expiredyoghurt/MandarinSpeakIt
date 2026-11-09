@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!--stamp--><script type="importmap">{"imports":{"/app.js":"/app.js?v=0.7.0-6b0b86ff","/radicals.js":"/radicals.js?v=0.7.0-48bd80d1","/zh-data.js":"/zh-data.js?v=0.7.0-edc6fe21","/zh-engine.js":"/zh-engine.js?v=0.7.0-79d55fe7","/zh-gloss.js":"/zh-gloss.js?v=0.7.0-d0651891","/zh-meaning.js":"/zh-meaning.js?v=0.7.0-9b0ef531","/zh-pic.js":"/zh-pic.js?v=0.7.0-c35b3b65","/zh-speech.js":"/zh-speech.js?v=0.7.0-18643c3a","/zh-ui.js":"/zh-ui.js?v=0.7.0-2df8ffec"}}</script><!--/stamp--><title>Radical finder 部首查找 (bùshǒu cházhǎo)</title>
+<style>:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;height:100%;background:radial-gradient(circle at 20% 0,#2a2560,#1b1740 60%) fixed;color:#fff6e0;font:18px/1.35 "PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:max(12px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;height:100dvh}
+h1{margin:.1em 0;font-size:26px}a{color:#ffc857}nav{display:flex;gap:6px 18px;flex-wrap:wrap}nav a{display:inline-flex;align-items:center;min-height:48px}a:focus-visible{outline:4px solid #ffc857;outline-offset:2px}</style></head>
+<body><main><div><h1>部首查找 Radical finder</h1><nav><a href="/">Speak Mandarin 讲华语</a><a href="/teacher.html">Teacher page</a></nav></div><div id="rf" style="display:flex;flex-direction:column;flex:1;min-height:0"></div></main>
+<script type="module">
+import {radicalFinder} from './radicals.js';
+const p=new URLSearchParams(location.search),mode=['tap','on'].includes(p.get('pinyin'))?p.get('pinyin'):'tap',unit=Math.max(1,Math.min(99,+p.get('unit')||99));
+document.getElementById('rf').append(radicalFinder({maxUnit:unit,unit:Math.min(unit,15),pinyin:mode}));
+</script></body></html>

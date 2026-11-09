@@ -27,15 +27,19 @@ export const offered=(k,key,u)=>{
 
 // ---- Session composer (about 12 minutes at most). states: Map 'kind:key' -> state. ----
 const SECS={strokes:20,sort:35,redup:25,opp:20,pick:20,odd:25,build:40,part:25,share:25,type:25,measure:25,order:45,dde:25,say:30};
-export function compose(o){ // {unit, states, day, voice, seed}
+let YOUNG=false;export const setYoung=b=>{YOUNG=!!b};
+const YSKIP=new Set(['type','dde','redup','strokes']);
+export function makeItem(spec,unit,seed){const it=makeItem0(spec,unit,seed);if(YOUNG&&it&&Array.isArray(it.options)&&it.options.length===4&&typeof it.answer==='string'&&['pick','odd','share','part'].includes(it.t)){const i=it.options.findIndex(o=>(o.value??o)!==it.answer);if(i>=0)it.options=it.options.filter((_,j)=>j!==i)}return it}
+export function compose(o){ // {unit, states, day, voice, seed, young}
+ YOUNG=!!o.young;
  const rng=mulberry(o.seed|0),sh=a=>[...a].sort(()=>rng()-.5),S=o.states||new Map(),u=o.unit,steps=[];
  const lv=(k,key)=>level(S.get(k+':'+key)),due=(k,key)=>{const s=S.get(k+':'+key);return s&&s.due<=o.day&&s.h.length>0};
  const cand=[];
  for(const c of poolChars(u)){cand.push({k:'c',key:c.c});}
  for(const w of poolWords(u))cand.push({k:'w',key:w.w});
  for(const m of poolMeasures(u))cand.push({k:'m',key:m.n});
- for(const s of poolSents(u))cand.push({k:'s',key:String(s.id)});
- for(const d of poolDde(u))cand.push({k:'d',key:String(d.i)});
+ for(const s of poolSents(u).filter(s=>!YOUNG||(s.tiles||[]).length<=4))cand.push({k:'s',key:String(s.id)});
+ if(!YOUNG)for(const d of poolDde(u))cand.push({k:'d',key:String(d.i)});
  for(const o of poolOpp(u))cand.push({k:'o',key:o.key});
  const dueL=sh(cand.filter(x=>due(x.k,x.key))).slice(0,4);
  const fresh=cand.filter(x=>lv(x.k,x.key)===0&&!dueL.includes(x));
@@ -46,18 +50,18 @@ export function compose(o){ // {unit, states, day, voice, seed}
  const fill=sh(cand.filter(x=>lv(x.k,x.key)===2&&!dueL.includes(x)));
  const order=[...dueL.map(x=>({...x,blk:'review'})),...newL.map(x=>({...x,blk:'new'})),...learn.slice(0,5).map(x=>({...x,blk:'practice'})),...fill.slice(0,3).map(x=>({...x,blk:'practice'}))];
  const seen=new Set();let tot=0,full=false;
- const add=(x,t)=>{if(full)return;if(tot+SECS[t]>720){full=true;return}tot+=SECS[t];steps.push({...x,t})};
+ const add=(x,t)=>{if(full)return;if(tot+SECS[t]>(YOUNG?420:720)){full=true;return}tot+=SECS[t];steps.push({...x,t})};
  for(const x of order){const sig=x.k+x.key;if(seen.has(sig))continue;seen.add(sig);
-  const ts=actsFor(x,rng).filter(t=>makeItem({t,key:x.key},u,1));
+  const ts=actsFor(x,rng).filter(t=>!(YOUNG&&YSKIP.has(t))&&makeItem({t,key:x.key},u,1));
   for(const t of ts.slice(0,x.blk==='new'?2:1))add(x,t)}
  // a brand-new pupil has little to review: top the session up with more unseen items so it is a real session, newest unit first
- for(const x of sh(fresh).sort((a,b)=>uOf(b)-uOf(a))){if(steps.length>=10||full)break;const sig=x.k+x.key;if(seen.has(sig))continue;seen.add(sig);
-  const t=actsFor(x,rng).find(t=>makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}
+ for(const x of sh(fresh).sort((a,b)=>uOf(b)-uOf(a))){if(steps.length>=(YOUNG?7:10)||full)break;const sig=x.k+x.key;if(seen.has(sig))continue;seen.add(sig);
+  const t=actsFor(x,rng).find(t=>!(YOUNG&&YSKIP.has(t))&&makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}
  // v0.4: with big newest units, older grammar items (measure words, 的/地/得, opposites) could wait many sessions. If this session has none, add one unseen one from any unit the pupil has reached.
- if(!full&&!steps.some(x=>x.k==='m'||x.k==='d'||x.k==='o')){const g=sh(fresh.filter(x=>'mdo'.includes(x.k)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
-  if(x){const t=actsFor(x,rng).find(t=>makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}}
+ if(!full&&!steps.some(x=>x.k==='m'||x.k==='d'||x.k==='o')){const g=sh(fresh.filter(x=>(YOUNG?'mo':'mdo').includes(x.k)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
+  if(x){const t=actsFor(x,rng).find(t=>!(YOUNG&&YSKIP.has(t))&&makeItem({t,key:x.key},u,1));if(t)add({...x,blk:'new'},t)}}
  // same for reduplication (AA, A一A): it rides on words, so an unseen older reduplicated word would otherwise wait behind the newest unit's words
- if(!full&&!steps.some(x=>x.t==='redup')){const g=sh(fresh.filter(x=>x.k==='w'&&REDUP.some(r=>r.w===x.key)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
+ if(!full&&!YOUNG&&!steps.some(x=>x.t==='redup')){const g=sh(fresh.filter(x=>x.k==='w'&&REDUP.some(r=>r.w===x.key)&&!seen.has(x.k+x.key))).sort((a,b)=>uOf(b)-uOf(a)),x=g[0];
   if(x&&makeItem({t:'redup',key:x.key},u,1))add({...x,blk:'new'},'redup')}
  if(o.voice){const say=sh([...poolWords(u).filter(w=>lv('w',w.w)>=1).map(w=>({k:'w',key:w.w})),...poolSents(u).filter(s=>lv('s',s.id)>=1).map(s=>({k:'s',key:String(s.id)}))]).slice(0,3);
   for(const x of say){if(tot+SECS.say>720)break;tot+=SECS.say;steps.push({...x,blk:'say',t:'say'})}}
@@ -83,7 +87,7 @@ function pyOptions(word,rng,pool){const sy=wordSyl(word),correct=sy.join(''),opt
  for(const w of shuffleWith(pool,rng)){if(opts.size>=4)break;if(w.w.length===word.length)opts.add(wordSyl(w.w).join(''))}
  return{correct,options:shuffleWith([...opts].slice(0,4),rng)}}
 
-export function makeItem(spec,unit,seed){const rng=mulberry(seed|0),t=spec.t,key=spec.key,pw=poolWords(unit),pc=poolChars(unit);
+function makeItem0(spec,unit,seed){const rng=mulberry(seed|0),t=spec.t,key=spec.key,pw=poolWords(unit),pc=poolChars(unit);
  if(t==='pick'){const w=D.BYW[key],modes=['py','hear'];if(w.emo)modes.push('emoji');const mode=modes[Math.floor(rng()*modes.length)];
   if(mode==='py'){const r=pyOptions(w.w,rng,pw);return{t,mode,key,show:w.w,options:r.options,answer:r.correct,say:w.w}}
   const others=shuffleWith(pw.filter(x=>x.w!==w.w&&x.w.length===w.w.length&&(mode!=='emoji'||x.emo)),rng).slice(0,3);
@@ -164,4 +168,4 @@ export function judge(target,alts){
  return{result,acc:best.acc,per:best.per,hint:result==='correct'?-1:worst,heard:best.heard}}
 // Simple tone contour for the grown-ups' "hear the tones" view (5 = neutral)
 export const CONTOUR={1:'¯',2:'↗',3:'↘↗',4:'↘',5:'·'};
-export default {poolOpp,checkSort,BOXES,blank,update,mastered,level,mulberry,poolChars,poolWords,poolSents,poolMeasures,poolDde,offered,compose,makeItem,checkBuild,checkOrder,checkPick,judge,sylScore,CONTOUR,CJK,retone};
+export default {setYoung,poolOpp,checkSort,BOXES,blank,update,mastered,level,mulberry,poolChars,poolWords,poolSents,poolMeasures,poolDde,offered,compose,makeItem,checkBuild,checkOrder,checkPick,judge,sylScore,CONTOUR,CJK,retone};
